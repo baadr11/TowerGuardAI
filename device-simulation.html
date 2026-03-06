@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TowerGuard — Saudi Sovereign Digital Twin Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060b14;--s1:#0d1520;--s2:#111d2e;--accent:#00b4ff;--ok:#00e5a0;--warn:#ffb800;--danger:#ff3d5a;--text:#dde6f0;--muted:#4a6080;--border:rgba(0,180,255,.12);--mono:'JetBrains Mono',monospace;--font:'Tajawal',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,180,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* UNIFIED NAV */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(6,11,20,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+.nav-brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:900;color:var(--accent)}
+.nav-brand svg{width:28px;height:28px}
+.nav-links{display:flex;gap:4px}
+.nav-links a{padding:8px 16px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px;font-weight:700;transition:all .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--text);background:var(--s2)}
+.nav-links a.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+.nav-status{display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono)}
+.ws-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);transition:background .3s}
+.ws-dot.connected{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+
+/* LAYOUT */
+.main{flex:1;display:grid;grid-template-columns:320px 1fr;gap:16px;padding:20px 24px;max-width:1400px;margin:0 auto;width:100%}
+@media(max-width:900px){.main{grid-template-columns:1fr}}
+
+/* LEFT: DEVICE PANEL */
+.device-panel{display:flex;flex-direction:column;gap:12px}
+.panel-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.device-body{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:20px;text-align:center;position:relative}
+.device-chip{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
+.device-name{font-size:16px;font-weight:900;color:#fff;margin-bottom:4px}
+.chip-badge{display:inline-block;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:var(--mono);background:rgba(0,180,255,.1);color:var(--accent);border:1px solid rgba(0,180,255,.2);margin-bottom:8px}
+
+/* LED indicators */
+.leds{display:flex;justify-content:center;gap:16px;margin-top:12px}
+.led-item{display:flex;flex-direction:column;align-items:center;gap:4px}
+.led{width:10px;height:10px;border-radius:50%;transition:all .3s}
+.led.on{box-shadow:0 0 8px currentColor}
+.led-label{font-size:9px;color:var(--muted);text-transform:uppercase;font-family:var(--mono)}
+
+/* Specs */
+.specs{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;font-family:var(--mono);font-size:11px;line-height:1.8}
+.specs .h{color:var(--ok);font-weight:700}
+.specs .k{color:var(--muted)}
+.specs .v{color:#fff}
+
+/* Serial Monitor */
+.serial-wrap{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;flex:1;min-height:200px;display:flex;flex-direction:column}
+.serial-header{padding:8px 12px;background:var(--s2);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--ok);font-family:var(--mono)}
+.serial{flex:1;padding:8px 12px;overflow-y:auto;font-family:var(--mono);font-size:11px;line-height:1.6;max-height:350px}
+.serial-line{white-space:nowrap}
+.serial-line.tx{color:var(--accent)}
+.serial-line.rx{color:var(--ok)}
+.serial-line.err{color:var(--danger)}
+.serial-line.sys{color:var(--warn)}
+
+/* RIGHT: CENTER PANEL */
+.center{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card-title{font-size:14px;font-weight:700;color:#fff;margin-bottom:10px}
+
+/* Metrics grid */
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.metric{background:var(--s2);border-radius:10px;padding:12px;text-align:center}
+.metric-val{font-size:24px;font-weight:900;font-family:var(--mono)}
+.metric-label{font-size:10px;color:var(--muted);margin-top:3px}
+.metric-bar{height:4px;background:rgba(255,255,255,.05);border-radius:2px;margin-top:6px;overflow:hidden;transform:scaleX(-1)}
+.metric-bar-fill{height:100%;border-radius:2px;transition:width .5s,background .3s}
+
+/* Scenario buttons */
+.scenario-row{display:flex;gap:8px;flex-wrap:wrap}
+.s-btn{padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);border:1px solid;transition:all .2s}
+
+/* Risk result */
+.risk-display{display:flex;align-items:center;gap:16px}
+.risk-ring{position:relative;width:100px;height:100px;flex-shrink:0}
+.risk-ring svg{transform:rotate(-90deg)}
+.risk-ring .track{fill:none;stroke:var(--s2);stroke-width:10}
+.risk-ring .fill{fill:none;stroke-width:10;stroke-linecap:round;transition:all .6s}
+.risk-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.risk-pct{font-size:24px;font-weight:900;font-family:var(--mono)}
+.risk-label{font-size:11px;color:var(--muted)}
+
+/* Connection layers */
+.layers-status{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.layer-card{padding:10px;border-radius:8px;text-align:center;font-size:11px}
+.layer-card.active{border:1px solid}
+.layer-title{font-weight:700;font-size:12px;margin-bottom:3px}
+
+.footer{padding:12px 24px;text-align:center;color:var(--muted);font-size:11px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- UNIFIED NAVIGATION -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16M12 4v16M8 8l4-4 4 4M6 16l6-4 6 4"/></svg>
+      TowerGuard
+    </div>
+    <div class="nav-links">
+      <a href="/">العرض التقديمي</a>
+      <a href="/predictor">لوحة التحكم</a>
+      <a href="/device" class="active">محاكاة الجهاز</a>
+      <a href="/map">خريطة الأبراج</a>
+      <a href="/market">دراسة الجدوى</a>
+    </div>
+    <div class="nav-status">
+      <div class="ws-dot" id="wsDot"></div>
+      <span id="wsLabel">غير متصل</span>
+      <span style="color:var(--muted);font-size:11px">|  Uptime: <span id="uptime">00:00:00</span></span>
+    </div>
+  </nav>
+
+  <div class="main">
+    <!-- LEFT: DEVICE -->
+    <div class="device-panel">
+      <div class="panel-title">🔌 الجهاز الفيزيائي</div>
+      <div class="device-body">
+        <div class="chip-badge">ESP32-S3</div>
+        <div class="device-name">TOWERGUARD-01</div>
+        <div class="device-chip">
+          240MHz ثنائي النواة • 4MB Flash<br>
+          SIM7600SA-H (B1/B3/B28) • MQTT v3.1.1
+        </div>
+        <div class="leds">
+          <div class="led-item"><div class="led on" style="background:var(--ok);color:var(--ok)" id="ledPwr"></div><div class="led-label">POWER</div></div>
+          <div class="led-item"><div class="led on" style="background:var(--accent);color:var(--accent)" id="ledNet"></div><div class="led-label">NET</div></div>
+          <div class="led-item"><div class="led" style="background:var(--muted)" id="ledAlert"></div><div class="led-label">ALERT</div></div>
+        </div>
+      </div>
+
+      <div class="specs">
+        <div class="h">// المواصفات</div>
+        <div><span class="k">المعالج:</span> <span class="v">ESP32-S3</span></div>
+        <div><span class="k">المودم:</span> <span class="v">SIM7600SA-H — معيار قياسي معتمد (B1/B3/B28)</span></div>
+        <div><span class="k">الطاقة:</span> <span class="v">Li-Po 3.7V</span></div>
+        <div class="h" style="margin-top:6px">// البرمجيات</div>
+        <div><span class="k">النظام:</span> <span class="v">FreeRTOS</span></div>
+        <div><span class="k">البروتوكول:</span> <span class="v">MQTT → WebSocket</span></div>
+        <div><span class="k">النموذج:</span> <span class="v">RF  (200 شجرة)</span></div>
+        <div class="h" style="margin-top:6px">// التكلفة</div>
+        <div><span class="k">BOM:</span> <span class="v" style="color:var(--ok)">~120 ريال</span></div>
+        <div><span class="k">سعر البيع:</span> <span class="v" style="color:var(--warn)">450 ريال</span></div>
+      </div>
+
+      <div class="serial-wrap">
+        <div class="serial-header">📟 Serial Monitor — 115200 baud</div>
+        <div class="serial" id="serial"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: CENTER -->
+    <div class="center">
+      <div class="card">
+        <div class="card-title">📊 قراءات المستشعر — الوقت الفعلي (WebSocket)</div>
+        <div class="scenario-row" style="margin-bottom:12px">
+          <button class="s-btn" style="border-color:rgba(0,229,160,.3);background:rgba(0,229,160,.08);color:var(--ok)" onclick="setMode('normal')">🟢 طبيعي</button>
+          <button class="s-btn" style="border-color:rgba(255,184,0,.3);background:rgba(255,184,0,.08);color:var(--warn)" onclick="setMode('degrading')">🟡 تدهور</button>
+          <button class="s-btn" style="border-color:rgba(255,61,90,.3);background:rgba(255,61,90,.08);color:var(--danger)" onclick="setMode('critical')">🔴 حرج</button>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="metric-val" id="mRssi" style="color:var(--ok)">-65</div><div class="metric-label">RSSI (dBm)</div><div class="metric-bar"><div class="metric-bar-fill" id="bRssi" style="width:60%;background:var(--ok)"></div></div></div>
+          <div class="metric"><div class="metric-val" id="mSnr" style="color:var(--ok)">18</div><div class="metric-label">SNR (dB)</div><div class="metric-bar"><div class="metric-bar-fill" id="bSnr" style="width:50%;background:var(--ok)"></div></div></div>
+          <div class="metric"><div class="metric-val" id="mLat" style="color:var(--ok)">25</div><div class="metric-label">زمن الاستجابة (ms)</div><div class="metric-bar"><div class="metric-bar-fill" id="bLat" style="width:5%;background:var(--ok)"></div></div></div>
+          <div class="metric"><div class="metric-val" id="mPkt" style="color:var(--ok)">1.0</div><div class="metric-label">فقدان الحزم (%)</div><div class="metric-bar"><div class="metric-bar-fill" id="bPkt" style="width:2%;background:var(--ok)"></div></div></div>
+          <div class="metric"><div class="metric-val" id="mLoad" style="color:var(--ok)">45</div><div class="metric-label">الحمل (%)</div><div class="metric-bar"><div class="metric-bar-fill" id="bLoad" style="width:45%;background:var(--ok)"></div></div></div>
+          <div class="metric"><div class="metric-val" id="mTemp" style="color:var(--ok)">38</div><div class="metric-label">الحرارة (°C)</div><div class="metric-bar"><div class="metric-bar-fill" id="bTemp" style="width:40%;background:var(--ok)"></div></div></div>
+        </div>
+      </div>
+
+      <!-- AI PREDICTION -->
+      <div class="card">
+        <div class="card-title">🤖 نتيجة التنبؤ — خطورة متعددة المستويات</div>
+        <div class="risk-display">
+          <div class="risk-ring">
+            <svg viewBox="0 0 100 100" width="100" height="100">
+              <circle class="track" cx="50" cy="50" r="40"/>
+              <circle class="fill" id="riskFill" cx="50" cy="50" r="40" stroke-dasharray="251" stroke-dashoffset="251"/>
+            </svg>
+            <div class="risk-center">
+              <div class="risk-pct" id="riskPct">—%</div>
+              <div class="risk-label" id="riskLabel">انتظار</div>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13px;margin-bottom:8px"><strong>الخطورة:</strong> <span id="sevBadge" style="padding:3px 10px;border-radius:12px;font-size:12px;background:rgba(0,229,160,.12);color:var(--ok)">مستقر</span></div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:4px">نطاق عدم اليقين 90%:</div>
+            <div style="font-family:var(--mono);font-size:14px" id="ciDisplay">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONNECTION LAYERS -->
+      <div class="card">
+        <div class="card-title">🔗 طبقات الاتصال — مفارقة الاتصال</div>
+        <div class="layers-status">
+          <div class="layer-card active" id="layerCloud" style="background:rgba(0,180,255,.08);border-color:var(--accent)">
+            <div class="layer-title" style="color:var(--accent)">☁️ سحابي</div>
+            <div>WebSocket نشط</div>
+          </div>
+          <div class="layer-card" id="layerSms" style="background:rgba(255,184,0,.05);border:1px solid rgba(255,184,0,.15)">
+            <div class="layer-title" style="color:var(--warn)">📱 SMS</div>
+            <div>احتياط جاهز</div>
+          </div>
+          <div class="layer-card" id="layerDms" style="background:rgba(255,61,90,.05);border:1px solid rgba(255,61,90,.15)">
+            <div class="layer-title" style="color:var(--danger)">🫀 نبض القلب</div>
+            <div>مهلة: 180 ثانية</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HEARTBEAT STATUS -->
+      <div class="card">
+        <div class="card-title">🫀 حالة نبض القلب — Dead Man's Switch</div>
+        <div style="font-family:var(--mono);font-size:12px" id="hbStatus">
+          <span style="color:var(--ok)">● حي</span> — آخر نبضة: الآن<br>
+          المهلة: 180 ثانية | إذا غاب النبض → إنذار تلقائي بالعربية
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">TowerGuard — Saudi Sovereign Digital Twin Prototype | ESP32 Edge Device Simulation | 2026</div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+//  WebSocket + Device Simulation
+// ════════════════════════════════════════════════════
+const WS_URL = `ws://${location.host}/ws/towers`;
+let ws = null;
+let scenario = 'normal';
+let simTimer = null;
+let uptimeSec = 0;
+const serial = document.getElementById('serial');
+
+/* : خنق تحديثات التنبؤ */
+let lastPredUpdate = 0;
+let pendingPred = null;
+const PRED_THROTTLE_MS = 250;
+
+function throttledUpdatePrediction(r) {
+  const now = Date.now();
+  pendingPred = r;
+  if (now - lastPredUpdate >= PRED_THROTTLE_MS) {
+    lastPredUpdate = now;
+    updatePrediction(pendingPred);
+    pendingPred = null;
+  } else if (!window._predThrottle) {
+    window._predThrottle = setTimeout(() => {
+      if (pendingPred) { lastPredUpdate = Date.now(); updatePrediction(pendingPred); pendingPred = null; }
+      window._predThrottle = null;
+    }, PRED_THROTTLE_MS - (now - lastPredUpdate));
+  }
+}
+
+const SCENARIOS = {
+  normal:    {rssi:[-70,-58], snr:[14,22], lat:[15,40], pkt:[0.2,2], load:[30,55], temp:[32,42]},
+  degrading: {rssi:[-95,-80], snr:[4,10], lat:[80,250], pkt:[5,15], load:[60,85], temp:[48,58]},
+  critical:  {rssi:[-110,-95], snr:[0,4], lat:[200,500], pkt:[15,35], load:[80,98], temp:[55,72]},
+};
+
+function rand(min,max){return min + Math.random()*(max-min)}
+function addSerial(text, cls='') {
+  const line = document.createElement('div');
+  line.className = 'serial-line ' + cls;
+  const ts = new Date().toLocaleTimeString('ar-SA',{hour12:false});
+  line.textContent = `[${ts}] ${text}`;
+  serial.appendChild(line);
+  serial.scrollTop = serial.scrollHeight;
+  while (serial.children.length > 60) serial.removeChild(serial.firstChild);
+}
+
+function colorFor(v) { return v >= 0.70 ? 'var(--danger)' : v >= 0.40 ? 'var(--warn)' : 'var(--ok)'; }
+
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => {
+    document.getElementById('wsDot').classList.add('connected');
+    document.getElementById('wsLabel').textContent = 'متصل ✓';
+    addSerial('✅ WebSocket متصل — بث فوري نشط', 'rx');
+    startSimulation();
+  };
+  ws.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d.type === 'prediction_results' && d.results?.[0]) throttledUpdatePrediction(d.results[0]);
+      if (d.type === 'heartbeat_ack') addSerial(`💓 ${d.message_ar}`, 'rx');
+      if (d.type === 'alert') {
+        addSerial(`🚨 ${d.message_ar}`, 'err');
+        document.getElementById('ledAlert').style.background = 'var(--danger)';
+        document.getElementById('ledAlert').classList.add('on');
+      }
+    } catch(err) {}
+  };
+  ws.onclose = () => {
+    document.getElementById('wsDot').classList.remove('connected');
+    document.getElementById('wsLabel').textContent = 'غير متصل';
+    addSerial('⚠️ WebSocket منقطع — إعادة اتصال...', 'err');
+    setTimeout(connectWS, 3000);
+  };
+}
+
+function startSimulation() {
+  if (simTimer) clearInterval(simTimer);
+  simTimer = setInterval(tick, 1500);
+  addSerial('🔄 بدء المحاكاة — قراءة كل 1.5 ثانية', 'sys');
+}
+
+function tick() {
+  const s = SCENARIOS[scenario];
+  const rssi = rand(...s.rssi), snr = rand(...s.snr), lat = rand(...s.lat);
+  const pkt = rand(...s.pkt), load = rand(...s.load), temp = rand(...s.temp);
+
+  // Update metrics UI
+  setMetric('mRssi','bRssi', rssi.toFixed(0), (110+rssi)/70*100);
+  setMetric('mSnr','bSnr', snr.toFixed(1), snr/35*100);
+  setMetric('mLat','bLat', lat.toFixed(0), lat/500*100);
+  setMetric('mPkt','bPkt', pkt.toFixed(1), pkt/40*100);
+  setMetric('mLoad','bLoad', load.toFixed(0), load);
+  setMetric('mTemp','bTemp', temp.toFixed(0), temp/85*100);
+
+  // Send via WebSocket
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({
+      type: 'predict',
+      towers: [{rssi_dbm:rssi, snr_db:snr, latency_ms:lat, packet_loss_pct:pkt, tower_load_pct:load, temp_celsius:temp}]
+    }));
+    addSerial(`📤 TX → rssi=${rssi.toFixed(0)} snr=${snr.toFixed(1)} pkt=${pkt.toFixed(1)}%`, 'tx');
+  }
+
+  // Send heartbeat every 5th tick
+  if (uptimeSec % 8 === 0 && ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({type:'heartbeat', tower_id:'TG-ESP32-01', rssi_dbm:rssi, verdict: scenario==='critical'?'danger':scenario==='degrading'?'warn':'ok'}));
+  }
+  uptimeSec++;
+  const h = String(Math.floor(uptimeSec/3600)).padStart(2,'0');
+  const m = String(Math.floor((uptimeSec%3600)/60)).padStart(2,'0');
+  const sec = String(uptimeSec%60).padStart(2,'0');
+  document.getElementById('uptime').textContent = `${h}:${m}:${sec}`;
+}
+
+function setMetric(valId, barId, val, pct) {
+  pct = Math.max(0, Math.min(100, pct));
+  const color = pct > 70 ? 'var(--danger)' : pct > 40 ? 'var(--warn)' : 'var(--ok)';
+  document.getElementById(valId).textContent = val;
+  document.getElementById(valId).style.color = color;
+  document.getElementById(barId).style.width = pct + '%';
+  document.getElementById(barId).style.background = color;
+}
+
+function updatePrediction(r) {
+  const p = r.probability || r.risk_percent/100 || 0;
+  const pct = Math.round(p*100);
+  const v = r.verdict || 'ok';
+
+  const circ = 2 * Math.PI * 40;
+  const fill = document.getElementById('riskFill');
+  fill.style.strokeDashoffset = circ * (1-p);
+  fill.style.stroke = colorFor(p);
+
+  document.getElementById('riskPct').textContent = pct + '%';
+  document.getElementById('riskLabel').textContent = v==='danger'?'حرج':v==='warn'?'متدهور':'مستقر';
+
+  const badge = document.getElementById('sevBadge');
+  badge.textContent = v==='danger'?'حرج':v==='warn'?'متدهور':'مستقر';
+  badge.style.background = v==='danger'?'rgba(255,61,90,.12)':v==='warn'?'rgba(255,184,0,.12)':'rgba(0,229,160,.12)';
+  badge.style.color = colorFor(p);
+
+  const ci = r.confidence_interval || {};
+  if (ci.low !== undefined) {
+    document.getElementById('ciDisplay').textContent = `[${Math.round(ci.low*100)}% — ${Math.round(ci.high*100)}%]`;
+  }
+
+  // LED
+  if (v==='danger') {
+    document.getElementById('ledAlert').style.background = 'var(--danger)';
+    document.getElementById('ledAlert').classList.add('on');
+  } else {
+    document.getElementById('ledAlert').style.background = 'var(--muted)';
+    document.getElementById('ledAlert').classList.remove('on');
+  }
+
+  addSerial(`📥 RX ← احتمال: ${pct}% — ${v==='danger'?'حرج':v==='warn'?'متدهور':'مستقر'}`, 'rx');
+}
+
+function setMode(name) {
+  scenario = name;
+  addSerial(`🔀 تغيير السيناريو: ${name==='normal'?'طبيعي':name==='degrading'?'تدهور':'حرج'}`, 'sys');
+}
+
+connectWS();
+</script>
+</body>
+</html>

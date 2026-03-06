@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TowerGuard — العرض التقديمي</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060b14;--s1:#0d1520;--s2:#111d2e;--accent:#00b4ff;--ok:#00e5a0;--warn:#ffb800;--danger:#ff3d5a;--text:#dde6f0;--muted:#4a6080;--border:rgba(0,180,255,.12);--mono:'JetBrains Mono',monospace;--font:'Tajawal',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,180,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* UNIFIED NAV */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(6,11,20,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+.nav-brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:900;color:var(--accent)}
+.nav-brand svg{width:28px;height:28px}
+.nav-links{display:flex;gap:4px}
+.nav-links a{padding:8px 16px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px;font-weight:700;transition:all .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--text);background:var(--s2)}
+.nav-links a.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+.nav-status{display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono)}
+.ws-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);transition:background .3s}
+.ws-dot.connected{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+
+/* MAIN */
+.main{flex:1;padding:20px 24px;max-width:1400px;margin:0 auto;width:100%}
+.section-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:700}
+.page-heading{font-size:22px;font-weight:900;color:#fff;margin-bottom:20px}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat-box{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.stat-num{font-size:28px;font-weight:900;font-family:var(--mono)}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* CARD */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.card-title{font-size:14px;font-weight:700;color:#fff;margin-bottom:10px}
+
+/* SLIDERS */
+.sim-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:16px}
+.slider-group{background:var(--s2);border-radius:8px;padding:10px 12px}
+.slider-group label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:700}
+.slider-group label span{color:var(--accent);font-family:var(--mono)}
+input[type=range]{width:100%;-webkit-appearance:none;background:rgba(0,180,255,.1);height:5px;border-radius:3px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer}
+
+/* RISK BAR */
+.risk-wrap{margin-bottom:16px}
+.risk-track{height:16px;background:var(--s2);border-radius:8px;overflow:hidden;position:relative}
+.risk-fill{height:100%;border-radius:8px;transition:width .5s,background .3s}
+.risk-info{display:flex;justify-content:space-between;margin-top:6px;font-size:12px;font-family:var(--mono)}
+
+/* SCENARIO BUTTONS */
+.scenario-btns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.s-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);border:1px solid;transition:all .2s}
+.s-btn:hover{transform:translateY(-1px)}
+.s-btn.active{box-shadow:0 0 12px rgba(0,180,255,.3)}
+
+/* ARCHITECTURE SECTION */
+.arch-layers{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:20px}
+.arch-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;overflow:hidden}
+.arch-card::before{content:'';position:absolute;top:0;right:0;width:4px;height:100%;border-radius:0 12px 12px 0}
+.arch-card.l1::before{background:var(--accent)}
+.arch-card.l2::before{background:var(--warn)}
+.arch-card.l3::before{background:var(--danger)}
+.arch-num{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;letter-spacing:1px}
+.arch-title{font-size:15px;font-weight:900;color:#fff;margin-bottom:6px}
+.arch-desc{font-size:12px;color:var(--muted);line-height:1.6}
+
+/* NARRATOR */
+.narrator{padding:16px;background:linear-gradient(135deg,rgba(0,180,255,.06),rgba(0,229,160,.04));border:1px solid var(--border);border-radius:12px;margin-bottom:16px}
+.narrator-title{font-size:14px;font-weight:900;color:var(--accent);margin-bottom:6px}
+.narrator-caption{font-size:13px;color:var(--text);min-height:20px}
+
+/* ALERT TOAST */
+.alert-toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);padding:14px 28px;border-radius:12px;font-weight:700;font-size:14px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none}
+.alert-toast.show{opacity:1}
+.alert-toast.danger{background:rgba(255,61,90,.9);color:#fff}
+.alert-toast.ok{background:rgba(0,229,160,.9);color:#000}
+
+/* FOOTER */
+.footer{padding:12px 24px;text-align:center;color:var(--muted);font-size:11px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- UNIFIED NAVIGATION -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16M12 4v16M8 8l4-4 4 4M6 16l6-4 6 4"/></svg>
+      TowerGuard
+    </div>
+    <div class="nav-links">
+      <a href="/" class="active">العرض التقديمي</a>
+      <a href="/predictor">لوحة التحكم</a>
+      <a href="/device">محاكاة الجهاز</a>
+      <a href="/map">خريطة الأبراج</a>
+      <a href="/market">دراسة الجدوى</a>
+    </div>
+    <div class="nav-status">
+      <div class="ws-dot" id="wsDot"></div>
+      <span id="wsLabel">غير متصل</span>
+      <span id="clock" style="color:var(--muted)">--:--:--</span>
+    </div>
+  </nav>
+
+  <!-- ALERT TOAST -->
+  <div class="alert-toast" id="alertToast"></div>
+
+  <div class="main">
+    <div class="section-title">PROTOTYPE SIMULATION</div>
+    <div class="page-heading">محاكاة البروتوتايب — التوأم الرقمي السعودي </div>
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" style="color:var(--accent)" id="sTowers">10,011</div><div class="stat-lbl">أبراج سعودية حقيقية</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--danger)" id="sAlerts">0</div><div class="stat-lbl">تنبيهات نشطة</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--ok)" id="sAccuracy">—</div><div class="stat-lbl">دقة النموذج (CV)</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--warn)" id="sLatency">—</div><div class="stat-lbl">زمن الاستجابة</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--accent)" id="sWsClients">0</div><div class="stat-lbl">عملاء WebSocket</div></div>
+    </div>
+
+    <!-- NARRATOR -->
+    <div class="narrator">
+      <div class="narrator-title" id="narratorTitle">🎬 نمثّل الآن: تدهور إشارة برج — الرياض شمال</div>
+      <div class="narrator-caption" id="narratorCaption">اختر سيناريو أو عدّل المؤشرات يدوياً</div>
+    </div>
+
+    <!-- RISK BAR -->
+    <div class="risk-wrap">
+      <div class="risk-track">
+        <div class="risk-fill" id="riskFill" style="width:5%;background:var(--ok)"></div>
+      </div>
+      <div class="risk-info">
+        <span id="riskVerdict" style="color:var(--ok)">● مستقر</span>
+        <span id="riskPct">5%</span>
+      </div>
+    </div>
+
+    <!-- SCENARIO BUTTONS -->
+    <div class="scenario-btns">
+      <button class="s-btn active" style="border-color:rgba(0,229,160,.3);background:rgba(0,229,160,.08);color:var(--ok)" onclick="setScenario('ok')">🟢 برج سليم</button>
+      <button class="s-btn" style="border-color:rgba(255,184,0,.3);background:rgba(255,184,0,.08);color:var(--warn)" onclick="setScenario('warn')">🟡 تحذير مبكر</button>
+      <button class="s-btn" style="border-color:rgba(255,61,90,.3);background:rgba(255,61,90,.08);color:var(--danger)" onclick="setScenario('danger')">🔴 خطر انقطاع</button>
+      <button class="s-btn" style="border-color:rgba(168,85,247,.3);background:rgba(168,85,247,.08);color:#a855f7" onclick="setScenario('heat')">🌡️ ارتفاع حرارة</button>
+      <button class="s-btn" id="btnAuto" style="border-color:rgba(0,180,255,.3);background:rgba(0,180,255,.08);color:var(--accent)" onclick="toggleAuto()">▶ محاكاة تلقائية</button>
+    </div>
+
+    <!-- SLIDERS -->
+    <div class="card">
+      <div class="card-title">⚙️ تحكم بمؤشرات البرج — التعديل يُرسل عبر WebSocket فوراً</div>
+      <div class="sim-row">
+        <div class="slider-group"><label>RSSI (dBm) <span id="vR">-65</span></label><input type="range" id="sR" min="-110" max="-40" value="-65"></div>
+        <div class="slider-group"><label>SNR (dB) <span id="vS">18</span></label><input type="range" id="sS" min="0" max="35" value="18"></div>
+        <div class="slider-group"><label>زمن الاستجابة (ms) <span id="vL">25</span></label><input type="range" id="sL" min="5" max="500" value="25"></div>
+        <div class="slider-group"><label>فقدان الحزم (%) <span id="vP">1</span></label><input type="range" id="sP" min="0" max="40" value="1" step="0.5"></div>
+        <div class="slider-group"><label>الحمل (%) <span id="vO">45</span></label><input type="range" id="sO" min="10" max="100" value="45"></div>
+        <div class="slider-group"><label>الحرارة (°C) <span id="vT">38</span></label><input type="range" id="sT" min="20" max="85" value="38"></div>
+      </div>
+    </div>
+
+    <!-- ARCHITECTURE -->
+    <div class="section-title" style="margin-top:10px">🏗️ البنية ثلاثية الطبقات — حل مفارقة الاتصال</div>
+    <div class="arch-layers">
+      <div class="arch-card l1">
+        <div class="arch-num">الطبقة ١ — CLOUD API</div>
+        <div class="arch-title">☁️ اتصال سحابي مباشر</div>
+        <div class="arch-desc">
+          الجهاز يرسل بيانات المستشعر عبر LTE/MQTT كل 30 ثانية.<br>
+          الخادم يُجري التنبؤ بـ 200 شجرة RandomForest ويُعيد النتيجة فوراً عبر WebSocket.<br>
+          <strong style="color:var(--accent)">فاصل ثقة 90% — predict_with_confidence()</strong>
+        </div>
+      </div>
+      <div class="arch-card l2">
+        <div class="arch-num">الطبقة ٢ — SMS FALLBACK</div>
+        <div class="arch-title">📱 الرسائل القصيرة كاحتياط</div>
+        <div class="arch-desc">
+          إذا فشل اتصال البيانات (LTE Data) يُرسل SIM7600 رسالة SMS.<br>
+          SMS يعمل على Circuit-Switched domain — يعمل حتى لو فشل Packet-Switched.<br>
+          <strong style="color:var(--warn)">تنسيق: TG-ALERT|tower_id=xxx|prob=85%</strong>
+        </div>
+      </div>
+      <div class="arch-card l3">
+        <div class="arch-num">الطبقة ٣ — DEAD MAN'S SWITCH</div>
+        <div class="arch-title">🫀 مراقب نبض القلب (180 ثانية)</div>
+        <div class="arch-desc">
+          إذا غاب النبض > 180 ثانية → <code>_heartbeat_watchdog</code> يُطلق الإنذار تلقائياً بالعربية.<br>
+          الإنذار يُدفع فوراً عبر WebSocket لكل العملاء المتصلين.<br>
+          <strong style="color:var(--danger)">⚠️ الجهاز فقد الاتصال — تنبيه حرج</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODEL INFO -->
+    <div class="card" id="modelInfoCard">
+      <div class="card-title">🤖 معلومات النموذج</div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--muted)" id="modelInfo">جاري التحميل...</div>
+    </div>
+  </div>
+
+  <div class="footer">TowerGuard — التوأم الرقمي السعودي | n_estimators=200 من config.py | ٢٠٢٦</div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+//  WebSocket Client (replaces 5s polling)
+// ════════════════════════════════════════════════════
+const WS_URL = `ws://${location.host}/ws/towers`;
+let ws = null;
+
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => {
+    document.getElementById('wsDot').classList.add('connected');
+    document.getElementById('wsLabel').textContent = 'متصل ✓';
+    sendReadings();
+    loadModelInfo();
+  };
+  ws.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d.type === 'prediction_results' && d.results?.[0]) handleResult(d.results[0]);
+      else if (d.type === 'alert') handleAlert(d);
+    } catch(err) {}
+  };
+  ws.onclose = () => {
+    document.getElementById('wsDot').classList.remove('connected');
+    document.getElementById('wsLabel').textContent = 'غير متصل';
+    setTimeout(connectWS, 3000);
+  };
+  ws.onerror = () => ws.close();
+}
+
+function sendReadings() {
+  if (!ws || ws.readyState !== 1) return;
+  ws.send(JSON.stringify({
+    type: 'predict',
+    towers: [{
+      rssi_dbm: +document.getElementById('sR').value,
+      snr_db: +document.getElementById('sS').value,
+      latency_ms: +document.getElementById('sL').value,
+      packet_loss_pct: +document.getElementById('sP').value,
+      tower_load_pct: +document.getElementById('sO').value,
+      temp_celsius: +document.getElementById('sT').value,
+    }]
+  }));
+}
+
+function handleResult(r) {
+  const pct = r.risk_percent || Math.round((r.probability||0)*100);
+  const v = r.verdict || 'ok';
+  const fill = document.getElementById('riskFill');
+  fill.style.width = pct + '%';
+  fill.style.background = v==='danger'?'var(--danger)':v==='warn'?'var(--warn)':'var(--ok)';
+
+  const vText = v==='danger'?'🔴 حرج':v==='warn'?'🟡 متدهور':'🟢 مستقر';
+  document.getElementById('riskVerdict').textContent = vText;
+  document.getElementById('riskVerdict').style.color = v==='danger'?'var(--danger)':v==='warn'?'var(--warn)':'var(--ok)';
+  document.getElementById('riskPct').textContent = pct + '%';
+
+  if (v==='danger') document.getElementById('sAlerts').textContent = '1';
+  else document.getElementById('sAlerts').textContent = '0';
+
+  const ci = r.confidence_interval;
+  if (ci) {
+    document.getElementById('sLatency').textContent = `${Math.round(ci.low*100)}%-${Math.round(ci.high*100)}%`;
+  }
+}
+
+function handleAlert(d) {
+  const toast = document.getElementById('alertToast');
+  toast.textContent = d.message_ar || `🚨 ${d.alert_type}: ${d.tower_id}`;
+  toast.className = 'alert-toast show danger';
+  setTimeout(() => toast.className = 'alert-toast', 5000);
+}
+
+async function loadModelInfo() {
+  try {
+    const res = await fetch('/api/model-info');
+    const d = await res.json();
+    if (d.ok) {
+      document.getElementById('sAccuracy').textContent = d.feature_importances ? '✓' : '—';
+      document.getElementById('modelInfo').innerHTML =
+        `النموذج: ${d.name || 'RandomForest'}<br>` +
+        `n_estimators: ${d.n_estimators || 200}<br>` +
+        `المؤشرات: ${(d.features||[]).length}<br>` +
+        `مستويات الخطورة: ${JSON.stringify(d.severity_labels||{})}`;
+    }
+  } catch(e) { document.getElementById('modelInfo').textContent = 'الخادم غير متوفر'; }
+}
+
+// ════════════════════════════════════════════════════
+//  Scenarios
+// ════════════════════════════════════════════════════
+const SCENARIOS = {
+  ok:     {rssi:-65,snr:18,lat:25,pkt:1,load:45,temp:38,caption:'📡 البرج يعمل بكفاءة عالية — جميع المؤشرات طبيعية'},
+  warn:   {rssi:-88,snr:8,lat:120,pkt:8,load:72,temp:52,caption:'⚠️ بداية تدهور — إشارة ضعيفة وزمن استجابة مرتفع'},
+  danger: {rssi:-102,snr:2,lat:350,pkt:22,load:90,temp:62,caption:'🔴 خطر انقطاع وشيك — فقدان حزم 22% وإشارة منهارة'},
+  heat:   {rssi:-75,snr:12,lat:80,pkt:5,load:65,temp:78,caption:'🌡️ ارتفاع حرارة المعدات — خطر تلف الإلكترونيات'},
+};
+
+function setScenario(name) {
+  const s = SCENARIOS[name]; if (!s) return;
+  document.getElementById('sR').value = s.rssi; document.getElementById('vR').textContent = s.rssi;
+  document.getElementById('sS').value = s.snr; document.getElementById('vS').textContent = s.snr;
+  document.getElementById('sL').value = s.lat; document.getElementById('vL').textContent = s.lat;
+  document.getElementById('sP').value = s.pkt; document.getElementById('vP').textContent = s.pkt;
+  document.getElementById('sO').value = s.load; document.getElementById('vO').textContent = s.load;
+  document.getElementById('sT').value = s.temp; document.getElementById('vT').textContent = s.temp;
+  document.getElementById('narratorCaption').textContent = s.caption;
+  document.querySelectorAll('.s-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  sendReadings();
+}
+
+// Auto-play demo
+let autoTimer = null;
+const autoSeq = ['ok','ok','warn','warn','danger','danger','heat','ok'];
+let autoIdx = 0;
+function toggleAuto() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; document.getElementById('btnAuto').textContent = '▶ محاكاة تلقائية'; return; }
+  document.getElementById('btnAuto').textContent = '⏸ إيقاف';
+  autoTimer = setInterval(() => {
+    const name = autoSeq[autoIdx % autoSeq.length]; autoIdx++;
+    const s = SCENARIOS[name];
+    document.getElementById('sR').value = s.rssi; document.getElementById('vR').textContent = s.rssi;
+    document.getElementById('sS').value = s.snr; document.getElementById('vS').textContent = s.snr;
+    document.getElementById('sL').value = s.lat; document.getElementById('vL').textContent = s.lat;
+    document.getElementById('sP').value = s.pkt; document.getElementById('vP').textContent = s.pkt;
+    document.getElementById('sO').value = s.load; document.getElementById('vO').textContent = s.load;
+    document.getElementById('sT').value = s.temp; document.getElementById('vT').textContent = s.temp;
+    document.getElementById('narratorCaption').textContent = s.caption;
+    sendReadings();
+  }, 3000);
+}
+
+// Slider events
+['sR','sS','sL','sP','sO','sT'].forEach((id,i) => {
+  const vIds = ['vR','vS','vL','vP','vO','vT'];
+  document.getElementById(id).addEventListener('input', function() {
+    document.getElementById(vIds[i]).textContent = this.value;
+    sendReadings();
+  });
+});
+
+// Clock
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('ar-SA',{hour12:false});
+}, 1000);
+
+connectWS();
+</script>
+</body>
+</html>

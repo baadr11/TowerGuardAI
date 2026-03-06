@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TowerGuard — Saudi Sovereign Digital Twin Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060b14;--s1:#0d1520;--s2:#111d2e;--accent:#00b4ff;--ok:#00e5a0;--warn:#ffb800;--danger:#ff3d5a;--text:#dde6f0;--muted:#4a6080;--border:rgba(0,180,255,.12);--mono:'JetBrains Mono',monospace;--font:'Tajawal',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,180,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* UNIFIED NAV */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(6,11,20,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+.nav-brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:900;color:var(--accent)}
+.nav-brand svg{width:28px;height:28px}
+.nav-links{display:flex;gap:4px}
+.nav-links a{padding:8px 16px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px;font-weight:700;transition:all .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--text);background:var(--s2)}
+.nav-links a.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+.nav-status{display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono)}
+.ws-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);transition:background .3s}
+.ws-dot.connected{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+/* sovereign-clean: no version identifiers */
+
+/* MAIN LAYOUT */
+.main{flex:1;padding:20px 24px;max-width:1400px;margin:0 auto;width:100%}
+.section-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:20px;transition:border-color .2s}
+.card:hover{border-color:var(--accent)}
+.card-label{font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:700}
+.card-value{font-size:32px;font-weight:900;font-family:var(--mono)}
+.card-sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* RISK GAUGE */
+.gauge-section{display:flex;align-items:center;gap:24px;margin-bottom:24px;padding:24px;background:var(--s1);border:1px solid var(--border);border-radius:16px}
+.gauge-ring{position:relative;width:160px;height:160px;flex-shrink:0}
+.gauge-ring svg{transform:rotate(-90deg)}
+.gauge-ring .track{fill:none;stroke:var(--s2);stroke-width:12}
+.gauge-ring .fill{fill:none;stroke-width:12;stroke-linecap:round;transition:stroke-dashoffset .8s ease,stroke .3s}
+.gauge-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.gauge-pct{font-size:36px;font-weight:900;font-family:var(--mono)}
+.gauge-label{font-size:13px;color:var(--muted);font-weight:700}
+
+/* CONFIDENCE BAR — : إصلاح RTL — التعبئة من اليمين لليسار */
+.confidence-section{flex:1}
+.confidence-title{font-size:14px;font-weight:700;margin-bottom:8px}
+.confidence-bar-wrap{position:relative;height:32px;background:var(--s2);border-radius:8px;overflow:hidden;margin-bottom:8px}
+.confidence-bar-range{position:absolute;top:0;height:100%;border-radius:8px;opacity:.3;transition:all .6s}
+.confidence-bar-point{position:absolute;top:50%;width:4px;height:24px;border-radius:2px;transform:translateY(-50%);transition:all .6s;z-index:2}
+.confidence-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:var(--mono)}
+.confidence-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.ci-stat{text-align:center;padding:8px;background:var(--s2);border-radius:8px}
+.ci-stat-val{font-size:18px;font-weight:900;font-family:var(--mono)}
+.ci-stat-label{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* SEVERITY BADGES */
+.severity-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700}
+.severity-0{background:rgba(0,229,160,.12);color:var(--ok)}
+.severity-1{background:rgba(255,184,0,.12);color:var(--warn)}
+.severity-2{background:rgba(255,61,90,.12);color:var(--danger)}
+
+/* SLIDERS */
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:24px}
+.slider-group{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:14px}
+.slider-group label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:700}
+.slider-group label span{color:var(--accent);font-family:var(--mono)}
+input[type=range]{width:100%;-webkit-appearance:none;background:var(--s2);height:6px;border-radius:3px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer}
+
+/* SCENARIO PRESETS */
+.scenario-bar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.scenario-label{font-size:13px;color:var(--muted);font-weight:700;margin-left:8px}
+.scenario-btn{padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);border:2px solid;transition:all .25s;background:transparent;position:relative;overflow:hidden}
+.scenario-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.scenario-btn.ok{color:var(--ok);border-color:rgba(0,229,160,.3)}
+.scenario-btn.ok:hover,.scenario-btn.ok.active{background:rgba(0,229,160,.15);border-color:var(--ok)}
+.scenario-btn.warn{color:var(--warn);border-color:rgba(255,184,0,.3)}
+.scenario-btn.warn:hover,.scenario-btn.warn.active{background:rgba(255,184,0,.15);border-color:var(--warn)}
+.scenario-btn.danger{color:var(--danger);border-color:rgba(255,61,90,.3)}
+.scenario-btn.danger:hover,.scenario-btn.danger.active{background:rgba(255,61,90,.15);border-color:var(--danger)}
+.scenario-btn .sc-icon{font-size:16px;margin-left:6px}
+.scenario-btn .sc-desc{font-size:10px;color:var(--muted);display:block;margin-top:2px}
+
+/* GLOBAL NOTIFICATION BAR */
+.global-notif{display:none;align-items:center;justify-content:center;gap:10px;padding:10px 20px;font-size:13px;font-weight:700;border-bottom:1px solid;animation:slideDown .3s ease}
+.global-notif.show{display:flex}
+.global-notif.ok-bar{background:rgba(0,229,160,.08);border-color:rgba(0,229,160,.2);color:var(--ok)}
+.global-notif.warn-bar{background:rgba(255,184,0,.08);border-color:rgba(255,184,0,.2);color:var(--warn)}
+.global-notif.danger-bar{background:rgba(255,61,90,.1);border-color:rgba(255,61,90,.25);color:var(--danger)}
+.global-notif .notif-pulse{width:8px;height:8px;border-radius:50%;animation:blink 1.5s infinite}
+.global-notif.ok-bar .notif-pulse{background:var(--ok)}
+.global-notif.warn-bar .notif-pulse{background:var(--warn)}
+.global-notif.danger-bar .notif-pulse{background:var(--danger)}
+@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ALERT BANNER */
+.alert-banner{display:none;padding:12px 20px;border-radius:10px;margin-bottom:16px;font-weight:700;font-size:14px;animation:pulse 2s infinite}
+.alert-banner.show{display:flex;align-items:center;gap:10px}
+.alert-banner.danger{background:rgba(255,61,90,.15);border:1px solid var(--danger);color:var(--danger)}
+.alert-banner.warn{background:rgba(255,184,0,.15);border:1px solid var(--warn);color:var(--warn)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+
+/* LIVE LOG */
+.log-panel{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px;max-height:200px;overflow-y:auto;font-family:var(--mono);font-size:12px}
+.log-entry{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.log-entry .ts{color:var(--muted)}
+.log-entry.alert{color:var(--danger)}
+.log-entry.ok{color:var(--ok)}
+
+/* FOOTER */
+.footer{padding:12px 24px;text-align:center;color:var(--muted);font-size:11px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- UNIFIED NAVIGATION BAR -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16M12 4v16M8 8l4-4 4 4M6 16l6-4 6 4"/></svg>
+      TowerGuard
+    </div>
+    <div class="nav-links">
+      <a href="/">العرض التقديمي</a>
+      <a href="/predictor" class="active">لوحة التحكم</a>
+      <a href="/device">محاكاة الجهاز</a>
+      <a href="/map">خريطة الأبراج</a>
+      <a href="/market">دراسة الجدوى</a>
+    </div>
+    <div class="nav-status">
+      <div class="ws-dot" id="wsDot"></div>
+      <span id="wsStatus">غير متصل</span>
+      <span class="nav-brand-sub">Saudi Sovereign Digital Twin</span>
+    </div>
+  </nav>
+
+  <!-- GLOBAL NOTIFICATION BAR -->
+  <div class="global-notif ok-bar show" id="globalNotif">
+    <span class="notif-pulse"></span>
+    <span id="globalNotifText">جميع الأبراج مستقرة — لا توجد تنبيهات</span>
+  </div>
+
+  <div class="main">
+    <!-- ALERT BANNER -->
+    <div class="alert-banner" id="alertBanner">
+      <span id="alertIcon">🚨</span>
+      <span id="alertText"></span>
+    </div>
+
+    <div class="section-title">📊 لوحة التحكم — تنبؤ فوري</div>
+
+    <!-- RISK GAUGE + CONFIDENCE BAR -->
+    <div class="gauge-section">
+      <div class="gauge-ring">
+        <svg viewBox="0 0 160 160" width="160" height="160">
+          <circle class="track" cx="80" cy="80" r="66"/>
+          <circle class="fill" id="gaugeFill" cx="80" cy="80" r="66"
+            stroke-dasharray="415" stroke-dashoffset="415"/>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-pct" id="riskPct">—%</div>
+          <div class="gauge-label" id="riskLabel">في انتظار البيانات</div>
+          <div id="severityBadge" class="severity-badge severity-0" style="margin-top:6px;font-size:11px">مستقر</div>
+        </div>
+      </div>
+
+      <!-- CONFIDENCE BAR — Section 4.2 FIX: was hidden, now visible -->
+      <div class="confidence-section">
+        <div class="confidence-title">📐 نطاق عدم اليقين 90% <span style="color:var(--muted);font-size:11px">(predict_with_confidence)</span></div>
+        <div class="confidence-bar-wrap">
+          <div class="confidence-bar-range" id="ciRange" style="right:20%;width:30%;background:var(--accent)"></div>
+          <div class="confidence-bar-point" id="ciPoint" style="right:35%;background:var(--accent)"></div>
+        </div>
+        <div class="confidence-labels">
+          <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+        </div>
+        <div class="confidence-stats">
+          <div class="ci-stat">
+            <div class="ci-stat-val" id="ciLow">—</div>
+            <div class="ci-stat-label">الحد الأدنى</div>
+          </div>
+          <div class="ci-stat">
+            <div class="ci-stat-val" id="ciMean" style="color:var(--accent)">—</div>
+            <div class="ci-stat-label">الاحتمال</div>
+          </div>
+          <div class="ci-stat">
+            <div class="ci-stat-val" id="ciHigh">—</div>
+            <div class="ci-stat-label">الحد الأعلى</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="section-title">📡 قراءات البرج</div>
+    <div class="grid" id="kpiCards">
+      <div class="card"><div class="card-label">RSSI (ديسيبل)</div><div class="card-value" id="kRssi">-72</div></div>
+      <div class="card"><div class="card-label">SNR (ديسيبل)</div><div class="card-value" id="kSnr">15</div></div>
+      <div class="card"><div class="card-label">زمن الاستجابة (مللي ثانية)</div><div class="card-value" id="kLat">45</div></div>
+      <div class="card"><div class="card-label">فقدان الحزم (%)</div><div class="card-value" id="kPkt">3.5</div></div>
+      <div class="card"><div class="card-label">الحمل (%)</div><div class="card-value" id="kLoad">55</div></div>
+      <div class="card"><div class="card-label">الحرارة (°C)</div><div class="card-value" id="kTemp">43</div></div>
+    </div>
+
+    <!-- SCENARIO PRESETS -->
+    <div class="section-title">⚡ سيناريوهات جاهزة — اختر لتعبئة القيم تلقائياً</div>
+    <div class="scenario-bar">
+      <button class="scenario-btn ok" onclick="applyScenario('ok')">
+        <span class="sc-icon">✅</span> برج سليم
+        <span class="sc-desc">RSSI: -68 | SNR: 18 | Latency: 35ms</span>
+      </button>
+      <button class="scenario-btn warn" onclick="applyScenario('degraded')">
+        <span class="sc-icon">⚠️</span> برج متدهور
+        <span class="sc-desc">RSSI: -88 | SNR: 8 | Packet Loss: 9%</span>
+      </button>
+      <button class="scenario-btn danger" onclick="applyScenario('critical')">
+        <span class="sc-icon">🔴</span> برج في خطر
+        <span class="sc-desc">RSSI: -98 | SNR: 3 | Packet Loss: 18%</span>
+      </button>
+      <button class="scenario-btn warn" onclick="applyScenario('heat')">
+        <span class="sc-icon">🌡️</span> إجهاد حراري
+        <span class="sc-desc">حرارة: 68°C | حمل: 92% | Latency: 180ms</span>
+      </button>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="section-title">🎛️ تعديل القراءات</div>
+    <div class="controls">
+      <div class="slider-group">
+        <label>RSSI (dBm) <span id="vRssi">-72</span></label>
+        <input type="range" id="sRssi" min="-120" max="-38" value="-72" step="1">
+      </div>
+      <div class="slider-group">
+        <label>SNR (dB) <span id="vSnr">15</span></label>
+        <input type="range" id="sSnr" min="-5" max="40" value="15" step="1">
+      </div>
+      <div class="slider-group">
+        <label>زمن الاستجابة (ms) <span id="vLat">45</span></label>
+        <input type="range" id="sLat" min="5" max="500" value="45" step="5">
+      </div>
+      <div class="slider-group">
+        <label>فقدان الحزم (%) <span id="vPkt">3.5</span></label>
+        <input type="range" id="sPkt" min="0" max="50" value="3.5" step="0.5">
+      </div>
+      <div class="slider-group">
+        <label>الحمل (%) <span id="vLoad">55</span></label>
+        <input type="range" id="sLoad" min="5" max="100" value="55" step="1">
+      </div>
+      <div class="slider-group">
+        <label>الحرارة (°C) <span id="vTemp">43</span></label>
+        <input type="range" id="sTemp" min="-10" max="75" value="43" step="1">
+      </div>
+    </div>
+
+    <!-- LIVE LOG -->
+    <div class="section-title">📜 السجل الحي</div>
+    <div class="log-panel" id="logPanel"></div>
+  </div>
+
+  <div class="footer">TowerGuard — التوأم الرقمي السعودي | ٢٠٢٦</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+//  WebSocket Client — يستبدل setInterval(fetchBatchPredictions, 5000)
+// ══════════════════════════════════════════════════════════════════════════
+
+const WS_URL = `ws://${location.host}/ws/towers`;
+let ws = null;
+let wsReconnectTimer = null;
+const logPanel = document.getElementById('logPanel');
+
+/* : خنق تحديثات الواجهة — الحد الأقصى مرة كل 300 مللي ثانية */
+let lastUIUpdate = 0;
+let pendingResult = null;
+const UI_THROTTLE_MS = 300;
+
+function throttledUpdateDashboard(result) {
+  const now = Date.now();
+  pendingResult = result;
+  if (now - lastUIUpdate >= UI_THROTTLE_MS) {
+    lastUIUpdate = now;
+    updateDashboard(pendingResult);
+    pendingResult = null;
+  } else if (!window._throttleTimer) {
+    window._throttleTimer = setTimeout(() => {
+      if (pendingResult) {
+        lastUIUpdate = Date.now();
+        updateDashboard(pendingResult);
+        pendingResult = null;
+      }
+      window._throttleTimer = null;
+    }, UI_THROTTLE_MS - (now - lastUIUpdate));
+  }
+}
+
+function addLog(msg, cls = '') {
+  const ts = new Date().toLocaleTimeString('ar-SA', {hour12:false});
+  const el = document.createElement('div');
+  el.className = 'log-entry ' + cls;
+  el.innerHTML = `<span class="ts">[${ts}]</span> ${msg}`;
+  logPanel.prepend(el);
+  if (logPanel.children.length > 50) logPanel.lastChild.remove();
+}
+
+function connectWS() {
+  if (ws && ws.readyState <= 1) return;
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    document.getElementById('wsDot').classList.add('connected');
+    document.getElementById('wsStatus').textContent = 'متصل ✓';
+    addLog('🔌 اتصال WebSocket نشط — تحديثات فورية', 'ok');
+    sendCurrentReadings();
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === 'prediction_results' && data.results && data.results.length > 0) {
+        throttledUpdateDashboard(data.results[0]);
+      } else if (data.type === 'alert') {
+        handleAlert(data);
+      } else if (data.type === 'heartbeat_ack') {
+        addLog(`💓 ${data.message_ar}`, 'ok');
+      }
+    } catch(err) { console.error(err); }
+  };
+
+  ws.onclose = () => {
+    document.getElementById('wsDot').classList.remove('connected');
+    document.getElementById('wsStatus').textContent = 'غير متصل';
+    addLog('⚠️ انقطع اتصال WebSocket — محاولة إعادة الاتصال...', 'alert');
+    wsReconnectTimer = setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => {
+    addLog('❌ خطأ في WebSocket — تراجع إلى HTTP', 'alert');
+    fallbackHTTP();
+  };
+}
+
+function sendCurrentReadings() {
+  if (!ws || ws.readyState !== 1) return;
+  const payload = {
+    type: 'predict',
+    towers: [{
+      rssi_dbm: parseFloat(document.getElementById('sRssi').value),
+      snr_db: parseFloat(document.getElementById('sSnr').value),
+      latency_ms: parseFloat(document.getElementById('sLat').value),
+      packet_loss_pct: parseFloat(document.getElementById('sPkt').value),
+      tower_load_pct: parseFloat(document.getElementById('sLoad').value),
+      temp_celsius: parseFloat(document.getElementById('sTemp').value),
+    }]
+  };
+  ws.send(JSON.stringify(payload));
+}
+
+// Fallback to HTTP if WebSocket fails
+async function fallbackHTTP() {
+  try {
+    const res = await fetch('/api/predict', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        rssi_dbm: parseFloat(document.getElementById('sRssi').value),
+        snr_db: parseFloat(document.getElementById('sSnr').value),
+        latency_ms: parseFloat(document.getElementById('sLat').value),
+        packet_loss_pct: parseFloat(document.getElementById('sPkt').value),
+        tower_load_pct: parseFloat(document.getElementById('sLoad').value),
+        temp_celsius: parseFloat(document.getElementById('sTemp').value),
+      })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      updateDashboard({
+        probability: data.probability_outage,
+        risk_percent: data.risk_percent,
+        verdict: data.verdict,
+        verdict_ar: data.verdict_ar || data.verdict,
+        confidence_interval: data.confidence_interval || {},
+      });
+    }
+  } catch(e) { addLog('❌ HTTP fallback فشل أيضاً', 'alert'); }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+//  Dashboard Update — with Confidence Bar
+// ══════════════════════════════════════════════════════════════════════════
+
+function updateDashboard(result) {
+  const pct = result.risk_percent || Math.round((result.probability || 0) * 100);
+  const p = result.probability || pct / 100;
+  const verdict = result.verdict || 'ok';
+  const verdictAr = result.verdict_ar || verdict;
+
+  // ── Gauge Ring ──
+  const circumference = 2 * Math.PI * 66;
+  const offset = circumference * (1 - p);
+  const fill = document.getElementById('gaugeFill');
+  fill.style.strokeDashoffset = offset;
+  fill.style.stroke = verdict === 'danger' ? 'var(--danger)' : verdict === 'warn' ? 'var(--warn)' : 'var(--ok)';
+
+  document.getElementById('riskPct').textContent = pct + '%';
+  document.getElementById('riskLabel').textContent = verdictAr;
+
+  // ── Severity Badge ──
+  const badge = document.getElementById('severityBadge');
+  const sevClass = verdict === 'danger' ? 'severity-2' : verdict === 'warn' ? 'severity-1' : 'severity-0';
+  const sevText = verdict === 'danger' ? 'حرج' : verdict === 'warn' ? 'متدهور' : 'مستقر';
+  badge.className = 'severity-badge ' + sevClass;
+  badge.textContent = sevText;
+
+  // ── Confidence Bar —  RTL FIX: يستخدم right بدلاً من left ──
+  const ci = result.confidence_interval || {};
+  const ciLow = ci.low !== undefined ? ci.low : Math.max(0, p - 0.15);
+  const ciHigh = ci.high !== undefined ? ci.high : Math.min(1, p + 0.15);
+
+  document.getElementById('ciLow').textContent = Math.round(ciLow * 100) + '%';
+  document.getElementById('ciMean').textContent = pct + '%';
+  document.getElementById('ciHigh').textContent = Math.round(ciHigh * 100) + '%';
+
+  const range = document.getElementById('ciRange');
+  const point = document.getElementById('ciPoint');
+  range.style.right = (ciLow * 100) + '%';
+  range.style.left = 'auto';
+  range.style.width = ((ciHigh - ciLow) * 100) + '%';
+  point.style.right = (p * 100) + '%';
+  point.style.left = 'auto';
+
+  const barColor = verdict === 'danger' ? 'var(--danger)' : verdict === 'warn' ? 'var(--warn)' : 'var(--ok)';
+  range.style.background = barColor;
+  point.style.background = barColor;
+
+  // ── Alert Banner ──
+  const banner = document.getElementById('alertBanner');
+  if (verdict === 'danger') {
+    banner.className = 'alert-banner show danger';
+    document.getElementById('alertIcon').textContent = '🔴';
+    document.getElementById('alertText').textContent = `تنبيه حرج — احتمال الانقطاع ${pct}% | نطاق عدم اليقين: [${Math.round(ciLow*100)}%, ${Math.round(ciHigh*100)}%]`;
+  } else if (verdict === 'warn') {
+    banner.className = 'alert-banner show warn';
+    document.getElementById('alertIcon').textContent = '⚠️';
+    document.getElementById('alertText').textContent = `تحذير — احتمال التدهور ${pct}%`;
+  } else {
+    banner.className = 'alert-banner';
+  }
+
+  addLog(`📊 تنبؤ: ${pct}% — ${verdictAr} | CI: [${Math.round(ciLow*100)}%, ${Math.round(ciHigh*100)}%]`,
+    verdict === 'danger' ? 'alert' : verdict === 'ok' ? 'ok' : '');
+
+  // Update global notification bar
+  updateGlobalNotif(verdict, pct);
+}
+
+function handleAlert(data) {
+  const banner = document.getElementById('alertBanner');
+  banner.className = 'alert-banner show danger';
+  document.getElementById('alertIcon').textContent = '🚨';
+  document.getElementById('alertText').textContent = data.message_ar || `تنبيه: ${data.tower_id} — ${data.alert_type}`;
+  addLog(`🚨 ${data.message_ar || data.alert_type}`, 'alert');
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+//  Slider Events — send via WebSocket on change
+// ══════════════════════════════════════════════════════════════════════════
+
+const sliders = [
+  {id:'sRssi', val:'vRssi', kpi:'kRssi'},
+  {id:'sSnr', val:'vSnr', kpi:'kSnr'},
+  {id:'sLat', val:'vLat', kpi:'kLat'},
+  {id:'sPkt', val:'vPkt', kpi:'kPkt'},
+  {id:'sLoad', val:'vLoad', kpi:'kLoad'},
+  {id:'sTemp', val:'vTemp', kpi:'kTemp'},
+];
+
+sliders.forEach(s => {
+  const slider = document.getElementById(s.id);
+  slider.addEventListener('input', () => {
+    document.getElementById(s.val).textContent = slider.value;
+    document.getElementById(s.kpi).textContent = slider.value;
+    sendCurrentReadings();
+  });
+});
+
+// ── Initialize ──
+connectWS();
+// Fallback: if WS doesn't connect within 3s, try HTTP
+setTimeout(() => {
+  if (!ws || ws.readyState !== 1) fallbackHTTP();
+}, 3000);
+
+// ══════════════════════════════════════════════════════════════════════════
+//  Scenario Presets — تعبئة تلقائية
+// ══════════════════════════════════════════════════════════════════════════
+
+const SCENARIOS = {
+  ok:       { rssi: -68, snr: 18, lat: 35,  pkt: 1.5, load: 45, temp: 38 },
+  degraded: { rssi: -88, snr: 8,  lat: 110, pkt: 9,   load: 72, temp: 48 },
+  critical: { rssi: -98, snr: 3,  lat: 220, pkt: 18,  load: 85, temp: 55 },
+  heat:     { rssi: -78, snr: 12, lat: 180, pkt: 8,   load: 92, temp: 68 },
+};
+
+function applyScenario(name) {
+  const s = SCENARIOS[name];
+  if (!s) return;
+
+  // Remove active from all buttons
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  // Add active to clicked
+  event.currentTarget.classList.add('active');
+
+  // Set slider values with smooth transition
+  const mapping = [
+    { slider: 'sRssi', val: 'vRssi', kpi: 'kRssi', v: s.rssi },
+    { slider: 'sSnr',  val: 'vSnr',  kpi: 'kSnr',  v: s.snr },
+    { slider: 'sLat',  val: 'vLat',  kpi: 'kLat',  v: s.lat },
+    { slider: 'sPkt',  val: 'vPkt',  kpi: 'kPkt',  v: s.pkt },
+    { slider: 'sLoad', val: 'vLoad', kpi: 'kLoad', v: s.load },
+    { slider: 'sTemp', val: 'vTemp', kpi: 'kTemp', v: s.temp },
+  ];
+
+  mapping.forEach(m => {
+    const sl = document.getElementById(m.slider);
+    sl.value = m.v;
+    document.getElementById(m.val).textContent = m.v;
+    document.getElementById(m.kpi).textContent = m.v;
+  });
+
+  const labels = { ok: 'برج سليم', degraded: 'برج متدهور', critical: 'برج في خطر', heat: 'إجهاد حراري' };
+  addLog(`⚡ سيناريو "${labels[name]}" — تم تطبيق القيم`, name === 'ok' ? 'ok' : name === 'critical' ? 'alert' : '');
+
+  sendCurrentReadings();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  Global Notification Bar Update
+// ══════════════════════════════════════════════════════════════════════════
+
+function updateGlobalNotif(verdict, pct) {
+  const bar = document.getElementById('globalNotif');
+  const text = document.getElementById('globalNotifText');
+
+  bar.classList.remove('ok-bar', 'warn-bar', 'danger-bar');
+
+  if (verdict === 'danger') {
+    bar.classList.add('danger-bar');
+    text.textContent = `تنبيه حرج — برج مراقَب باحتمال انقطاع ${pct}% — تدخل فوري مطلوب`;
+  } else if (verdict === 'warn') {
+    bar.classList.add('warn-bar');
+    text.textContent = `تحذير — برج متدهور باحتمال ${pct}% — يحتاج مراقبة مشددة`;
+  } else {
+    bar.classList.add('ok-bar');
+    text.textContent = 'جميع الأبراج مستقرة — لا توجد تنبيهات';
+  }
+  bar.classList.add('show');
+}
+</script>
+</body>
+</html>

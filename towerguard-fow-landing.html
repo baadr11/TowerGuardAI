@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TowerGuard — Saudi Sovereign Digital Twin Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#03070e;--bg2:#060c17;--s1:#091423;--s2:#0c1c30;--s3:#0f2240;--accent:#00aaee;--accent2:#0077bb;--ok:#00d48a;--ok2:#009e66;--warn:#f0a800;--danger:#ee3355;--purple:#6d28d9;--text:#ccd9e8;--muted:#3d5470;--border:rgba(0,170,238,.09);--bord2:rgba(0,170,238,.20);--bord3:rgba(0,170,238,.35);--mono:'JetBrains Mono',sans-serif;--font:'Tajawal',sans-serif;--r:14px}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,170,238,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,170,238,.018) 1px,transparent 1px);background-size:52px 52px;pointer-events:none}
+
+/* NAV */
+.nav{position:fixed;top:0;right:0;left:0;z-index:300;display:flex;align-items:center;justify-content:space-between;padding:13px 36px;background:rgba(3,7,14,.94);border-bottom:1px solid var(--border);backdrop-filter:blur(20px)}
+.nav-brand{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:900;color:var(--accent);letter-spacing:-.5px;text-decoration:none}
+.nav-brand svg{width:26px;height:26px}
+.nav-pill{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--warn);background:rgba(240,168,0,.07);border:1px solid rgba(240,168,0,.28);border-radius:20px;padding:5px 14px}
+.nav-clock{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 32px 72px;position:relative;overflow:hidden}
+.h-glow{position:absolute;top:20%;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(ellipse,rgba(0,170,238,.055) 0%,transparent 68%);pointer-events:none}
+.h-glow2{position:absolute;bottom:8%;right:8%;width:280px;height:280px;background:radial-gradient(ellipse,rgba(0,212,138,.04) 0%,transparent 70%);pointer-events:none}
+.track-pill{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--warn);background:rgba(240,168,0,.06);border:1px solid rgba(240,168,0,.30);border-radius:20px;padding:5px 15px;margin-bottom:28px;animation:fadeUp .5s ease both}
+.kicker{font-size:12px;color:var(--accent);font-weight:700;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:14px;animation:fadeUp .6s ease both .08s}
+.h1{font-size:clamp(28px,4.2vw,56px);font-weight:900;color:#fff;line-height:1.16;margin-bottom:10px;animation:fadeUp .6s ease both .14s}
+.h1 em{color:var(--accent);font-style:normal}
+.h1 strong{color:var(--ok)}
+.h-pivot{font-size:clamp(13px,1.7vw,19px);font-weight:700;color:var(--warn);margin-bottom:18px;animation:fadeUp .6s ease both .18s}
+.h-desc{max-width:660px;margin:0 auto 36px;font-size:14px;color:var(--muted);line-height:1.95;animation:fadeUp .6s ease both .22s}
+.h-desc strong{color:var(--text)}
+.kpis{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin-bottom:40px;animation:fadeUp .6s ease both .26s}
+.kpi{text-align:center}
+.kpi-n{font-size:30px;font-weight:900;font-family:var(--mono)}
+.kpi-l{font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:.5px}
+.ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;animation:fadeUp .6s ease both .30s}
+.btn-p{padding:13px 30px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);text-decoration:none;color:#fff;background:var(--accent);border:2px solid var(--accent);transition:all .22s}
+.btn-p:hover{background:var(--accent2);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,170,238,.28)}
+.btn-o{padding:13px 30px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);text-decoration:none;color:var(--accent);background:transparent;border:2px solid var(--bord2);transition:all .22s}
+.btn-o:hover{background:rgba(0,170,238,.06);transform:translateY(-2px)}
+.scroll-h{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:7px;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;animation:bob 2.5s ease-in-out infinite}
+.scroll-h svg{width:18px;height:18px}
+
+/* LAYOUT */
+hr.div{border:none;border-top:1px solid var(--border);margin:0 36px}
+.sec{padding:72px 36px;max-width:1200px;margin:0 auto}
+.sec-lbl{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px}
+.sec-h{font-size:clamp(20px,2.8vw,34px);font-weight:900;color:#fff;margin-bottom:10px;line-height:1.22}
+.sec-h em{color:var(--accent);font-style:normal}
+.sec-sub{font-size:13px;color:var(--muted);line-height:1.85;max-width:540px}
+
+/* IMPACT STRIP */
+.istrip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:36px}
+@media(max-width:720px){.istrip{grid-template-columns:1fr 1fr}}
+.icard{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:18px;text-align:center}
+.ic-n{font-size:26px;font-weight:900;font-family:var(--mono)}
+.ic-l{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5}
+
+/* JOURNEY */
+.j-wrap{margin-top:44px;position:relative}
+.j-line{position:absolute;right:25px;top:30px;bottom:30px;width:2px;background:linear-gradient(to bottom,var(--accent),var(--ok),var(--warn),var(--ok));border-radius:2px}
+.j-step{display:flex;gap:22px;margin-bottom:24px;padding-right:52px;position:relative;opacity:0;transform:translateX(18px);transition:all .5s ease}
+.j-step.vis{opacity:1;transform:translateX(0)}
+.j-dot{position:absolute;right:14px;top:18px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;font-family:var(--mono);flex-shrink:0;border:2px solid var(--bg);z-index:2}
+.d-accent{background:var(--accent);color:#000}
+.d-warn{background:var(--warn);color:#000}
+.d-danger{background:var(--danger);color:#fff}
+.d-purple{background:var(--purple);color:#fff}
+.d-ok{background:var(--ok);color:#000}
+.j-body{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:border-color .2s}
+.j-body:hover{border-color:var(--bord2)}
+.j-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 0;flex-wrap:wrap;gap:8px}
+.j-time{font-size:11px;font-family:var(--mono);color:var(--accent)}
+.j-lnk{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;text-decoration:none;transition:all .2s;border:1px solid}
+.lk-map{color:var(--accent);border-color:rgba(0,170,238,.3);background:rgba(0,170,238,.07)}.lk-map:hover{background:rgba(0,170,238,.16)}
+.lk-pred{color:var(--ok);border-color:rgba(0,212,138,.3);background:rgba(0,212,138,.07)}.lk-pred:hover{background:rgba(0,212,138,.16)}
+.lk-dev{color:var(--warn);border-color:rgba(240,168,0,.3);background:rgba(240,168,0,.07)}.lk-dev:hover{background:rgba(240,168,0,.16)}
+.lk-mkt{color:#a78bfa;border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.07)}.lk-mkt:hover{background:rgba(167,139,250,.16)}
+.lk-ok{color:var(--ok);border-color:rgba(0,212,138,.3);background:rgba(0,212,138,.07)}.lk-ok:hover{background:rgba(0,212,138,.16)}
+.j-cont{padding:12px 18px 16px}
+.j-t{font-size:14px;font-weight:900;color:#fff;margin-bottom:6px}
+.j-d{font-size:12px;color:var(--muted);line-height:1.75}
+.j-d strong{color:var(--text)}
+.j-ins{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:10px 12px;border-radius:8px;font-size:11px;line-height:1.65}
+.ins-a{background:rgba(0,170,238,.06);border:1px solid rgba(0,170,238,.2)}
+.ins-o{background:rgba(0,212,138,.05);border:1px solid rgba(0,212,138,.18)}
+.ins-w{background:rgba(240,168,0,.05);border:1px solid rgba(240,168,0,.18)}
+.ins-d{background:rgba(238,51,85,.05);border:1px solid rgba(238,51,85,.18)}
+.ins-p{background:rgba(109,40,217,.05);border:1px solid rgba(109,40,217,.2)}
+.ins-ico{font-size:14px;flex-shrink:0;margin-top:1px}
+
+/* AUTONOMY BANNER */
+.ab{background:linear-gradient(135deg,rgba(0,212,138,.06) 0%,rgba(0,170,238,.05) 100%);border:1px solid rgba(0,212,138,.25);border-radius:var(--r);padding:28px 32px;margin-top:28px;display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center}
+@media(max-width:600px){.ab{grid-template-columns:1fr}}
+.ab-ico{font-size:48px}
+.ab-lbl{font-size:10px;font-weight:700;color:var(--ok);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.ab-h{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px}
+.ab-h em{color:var(--ok);font-style:normal}
+.ab-d{font-size:13px;color:var(--muted);line-height:1.85}
+.ab-d strong{color:var(--text)}
+
+/* HUB */
+.hub-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:14px;margin-top:36px}
+.hub{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:20px;text-decoration:none;color:var(--text);transition:all .22s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:10px}
+.hub:hover{border-color:var(--bord2);transform:translateY(-3px);background:var(--s2)}
+.hub-n{font-size:9px;font-weight:700;color:var(--accent);letter-spacing:2.5px;text-transform:uppercase}
+.hub-ico{font-size:26px}
+.hub-t{font-size:14px;font-weight:900;color:#fff}
+.hub-d{font-size:11px;color:var(--muted);line-height:1.65}
+.hub-arr{position:absolute;bottom:16px;left:16px;font-size:16px;opacity:0;color:var(--accent);transition:all .22s}
+.hub:hover .hub-arr{opacity:1;left:20px}
+.hub-tag{display:inline-block;margin-top:auto;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid;color:var(--ok);border-color:rgba(0,212,138,.3);background:rgba(0,212,138,.06);width:fit-content}
+
+/* BA */
+.ba-g{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:36px}
+@media(max-width:680px){.ba-g{grid-template-columns:1fr}}
+.ba{border-radius:var(--r);padding:22px}
+.ba-b{background:rgba(238,51,85,.04);border:1px solid rgba(238,51,85,.18)}
+.ba-a{background:rgba(0,212,138,.04);border:1px solid rgba(0,212,138,.18)}
+.ba-lbl{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px}
+.ba-lbl.d{color:var(--danger)}.ba-lbl.o{color:var(--ok)}
+.ba-row{display:flex;align-items:flex-start;gap:9px;margin-bottom:12px;font-size:12px;line-height:1.65}
+
+/* TRUST */
+.trust-sec{padding:56px 36px;background:var(--bg2)}
+.trust-in{max-width:1200px;margin:0 auto}
+.trust-g{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:32px}
+@media(max-width:800px){.trust-g{grid-template-columns:1fr}}
+.seal{border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden}
+.seal::before{content:'';position:absolute;inset:0;opacity:.04;pointer-events:none}
+.seal-nca{background:var(--s1);border:1px solid rgba(109,40,217,.3)}.seal-nca::before{background:var(--purple)}
+.seal-fin{background:var(--s1);border:1px solid rgba(0,212,138,.25)}.seal-fin::before{background:var(--ok)}
+.seal-citc{background:var(--s1);border:1px solid rgba(240,168,0,.25)}.seal-citc::before{background:var(--warn)}
+.seal-hdr{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.seal-ico{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.seal-nca .seal-ico{background:rgba(109,40,217,.15)}
+.seal-fin .seal-ico{background:rgba(0,212,138,.12)}
+.seal-citc .seal-ico{background:rgba(240,168,0,.12)}
+.seal-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
+.seal-nca .seal-lbl{color:#a78bfa}.seal-fin .seal-lbl{color:var(--ok)}.seal-citc .seal-lbl{color:var(--warn)}
+.seal-t{font-size:14px;font-weight:900;color:#fff;margin-bottom:8px}
+.seal-d{font-size:11px;color:var(--muted);line-height:1.75}
+.seal-d strong{color:var(--text)}
+.seal-stmp{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid}
+.seal-nca .seal-stmp{color:#a78bfa;border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.07)}
+.seal-fin .seal-stmp{color:var(--ok);border-color:rgba(0,212,138,.3);background:rgba(0,212,138,.06)}
+.seal-citc .seal-stmp{color:var(--warn);border-color:rgba(240,168,0,.3);background:rgba(240,168,0,.06)}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:24px 36px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);flex-wrap:wrap;gap:10px;background:var(--bg)}
+.ft-brand{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--accent)}
+.ft-brand svg{width:16px;height:16px}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(7px)}}
+.fi{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .55s ease}
+.fi.vis{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="towerguard-fow-landing.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16M12 4v16M8 8l4-4 4 4M6 16l6-4 6 4"/></svg>
+    TowerGuard
+  </a>
+  <div class="nav-pill">⚡ مستقبل العمل · Future of Work · Tuwaiqthon</div>
+  <div class="nav-clock" id="clk">--:--:--</div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="h-glow"></div><div class="h-glow2"></div>
+  <div class="track-pill">⚡ FUTURE OF WORK TRACK · TUWAIQTHON 2026</div>
+  <div class="kicker">SAUDI SOVEREIGN DIGITAL TWIN PROTOTYPE</div>
+  <h1 class="h1">
+    مستقبل العمل يتوقف<br>
+    على <em>خلية واحدة</em><br>
+    <strong>TowerGuard لا يسمح لها بالتوقف</strong>
+  </h1>
+  <div class="h-pivot">عبدالرحمن الآن يُراقب — والنظام هو من يعمل.</div>
+  <p class="h-desc">
+    <strong>العمل عن بُعد، الرعاية الطبية الرقمية، المصانع الذكية</strong> — كلها تحتاج شبكة لا تنقطع.
+    TowerGuard يتنبأ بالانقطاع قبل وقوعه على <strong>10,011 برج سعودي حقيقي</strong>،
+    ويُطلق الإنذار تلقائياً حتى حين تنقطع الشبكة ذاتها.
+  </p>
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-n" style="color:var(--accent)">10,011</div><div class="kpi-l">برج سعودي حقيقي في النموذج</div></div>
+    <div class="kpi"><div class="kpi-n" style="color:var(--danger)">4,500</div><div class="kpi-l">ريال تكلفة كل انقطاع</div></div>
+    <div class="kpi"><div class="kpi-n" style="color:var(--ok)">90%</div><div class="kpi-l">ضمان رياضي ICP</div></div>
+    <div class="kpi"><div class="kpi-n" style="color:var(--warn)">3</div><div class="kpi-l">طبقات — لا نقطة فشل واحدة</div></div>
+  </div>
+  <div class="ctas">
+    <a href="tower-map.html" class="btn-p" target="_blank">🚀 ابدأ العرض التفاعلي</a>
+    <a href="#journey" class="btn-o">📖 رحلة المستخدم</a>
+  </div>
+  <div class="scroll-h">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+    اكتشف القصة
+  </div>
+</section>
+
+<hr class="div">
+
+<!-- IMPACT STRIP -->
+<section class="sec fi">
+  <div class="sec-lbl">الأثر الواقعي · Future of Work Impact</div>
+  <h2 class="sec-h">كل انقطاع يوقف <em>مستقبل</em> بأكمله</h2>
+  <p class="sec-sub">رقمنة العمل في رؤية 2030 تجعل كل برج خلوي عموداً فقرياً للاقتصاد الوطني.</p>
+  <div class="istrip">
+    <div class="icard"><div class="ic-n" style="color:var(--accent)">2.3M</div><div class="ic-l">موظف سعودي<br>يعمل رقمياً</div></div>
+    <div class="icard"><div class="ic-n" style="color:var(--danger)">$400B</div><div class="ic-l">خسائر انقطاعات<br>الشبكة عالمياً / سنة</div></div>
+    <div class="icard"><div class="ic-n" style="color:var(--ok)">~30%</div><div class="ic-l">انقطاعات يمنعها<br>TowerGuard استباقياً</div></div>
+    <div class="icard"><div class="ic-n" style="color:var(--warn)">99.7%</div><div class="ic-l">هدف جاهزية<br>CITC 2025</div></div>
+  </div>
+</section>
+
+<hr class="div">
+
+<!-- JOURNEY -->
+<section class="sec fi" id="journey">
+  <div class="sec-lbl">رحلة المستخدم الكاملة · Deep User Journey</div>
+  <h2 class="sec-h">ليلة عمل عبدالرحمن —<br><em>مهندس NOC · شبكة STC الرياض</em></h2>
+  <p class="sec-sub">كل خطوة مربوطة بملف تقني حقيقي. انقر على أي زر للتجربة المباشرة.</p>
+
+  <div class="j-wrap">
+    <div class="j-line"></div>
+
+    <div class="j-step" data-delay="0">
+      <div class="j-dot d-accent">1</div>
+      <div class="j-body">
+        <div class="j-head">
+          <div class="j-time">21:00 — المراقبة السيادية</div>
+          <a href="tower-map.html" class="j-lnk lk-map" target="_blank">🗺️ tower-map.html ←</a>
+        </div>
+        <div class="j-cont">
+          <div class="j-t">فتح خريطة المملكة — 10,011 برج في لحظة واحدة</div>
+          <div class="j-d">يفتح عبدالرحمن لوحة التحكم. أمامه خريطة GIS لكل أبراج السعودية — <strong>بيانات OpenCelliD الحقيقية MCC=420</strong>. في ثوانٍ: 847 برج أخضر، 14 أصفر، 2 أحمر. لا مكالمات، لا بريد. النظام يرى كل شيء.</div>
+          <div class="j-ins ins-a"><div class="ins-ico">💡</div><div><strong style="color:var(--accent)">مستقبل العمل:</strong> بدلاً من فريق 10 مهندسين يراقبون يدوياً، مهندس واحد يُدير 10,011 برج بكفاءة كاملة.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-step" data-delay="100">
+      <div class="j-dot d-warn">2</div>
+      <div class="j-body">
+        <div class="j-head">
+          <div class="j-time">22:30 — التنبؤ الرياضي</div>
+          <a href="tower-predictor.html" class="j-lnk lk-pred" target="_blank">🧠 tower-predictor.html ←</a>
+        </div>
+        <div class="j-cont">
+          <div class="j-t">برج T-4471 يُظهر تدهوراً — الذكاء الاصطناعي يتنبأ</div>
+          <div class="j-d">RSSI انخفض إلى -89dBm، الحرارة ترتفع. النموذج يحسب: <strong>احتمال انقطاع 67% خلال 45 دقيقة.</strong> فاصل ICP 90%: بين 58% و86%. تدخل استباقي فوري.</div>
+          <div class="j-ins ins-w"><div class="ins-ico">⚗️</div><div><strong style="color:var(--warn)">الإضافة التقنية:</strong> ICP يضمن رياضياً P(y ∈ CI) ≥ 90% — ليس تخميناً، بل ضمان مثبت بالنظرية (Tibshirani 2019).</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-step" data-delay="200">
+      <div class="j-dot d-danger">3</div>
+      <div class="j-body">
+        <div class="j-head">
+          <div class="j-time">23:45 — Dead Man's Switch</div>
+          <a href="device-simulation.html" class="j-lnk lk-dev" target="_blank">📟 device-simulation.html ←</a>
+        </div>
+        <div class="j-cont">
+          <div class="j-t">برج T-5833 صامت — الصمت نفسه يُطلق الإنذار</div>
+          <div class="j-d">لم يُرسل T-5833 heartbeat منذ 180 ثانية. API صامت، SMS لا يصل. النظام يستنتج تلقائياً: كهرباء مقطوعة. <strong>إنذار تلقائي بدون أي أمر بشري.</strong></div>
+          <div class="j-ins ins-d"><div class="ins-ico">🔴</div><div><strong style="color:var(--danger)">مفارقة الاتصال محلولة:</strong> لا يمكنك إرسال تنبيه عبر شبكة منقطعة. TowerGuard يجعل الصمت نفسه هو التنبيه.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-step" data-delay="300">
+      <div class="j-dot d-purple">4</div>
+      <div class="j-body">
+        <div class="j-head">
+          <div class="j-time">01:00 — الجدوى المستدامة</div>
+          <a href="market.html" class="j-lnk lk-mkt" target="_blank">💼 market.html ←</a>
+        </div>
+        <div class="j-cont">
+          <div class="j-t">3 انقطاعات مُمنَعة = 13,500 ريال موفّرة في ليلة واحدة</div>
+          <div class="j-d">كل انقطاع مُمنَع = 4,500 ريال توفير. التكاليف الكاملة مُدرَجة: اشتراك + <strong>12.6M ريال SIM لـ 10,011 برج</strong> + صيانة. صافي العائد: 185 ريال/برج/سنة.</div>
+          <div class="j-ins ins-p"><div class="ins-ico">📊</div><div><strong style="color:#a78bfa">للمحكم المالي:</strong> OPEX الكامل مذكور صراحةً — لا مفاجآت مالية. تكلفة SIM مُدرَجة في كل حساب ROI.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="j-step" data-delay="400">
+      <div class="j-dot d-ok">✓</div>
+      <div class="j-body">
+        <div class="j-head">
+          <div class="j-time">02:00 — الاستقرار الذاتي · System Autonomy Confirmed</div>
+          <a href="tower-map.html" class="j-lnk lk-ok" target="_blank">🗺️ tower-map.html ← العودة للخريطة السيادية</a>
+        </div>
+        <div class="j-cont">
+          <div class="j-t">عبدالرحمن يُراقب — التقرير يكتب نفسه تلقائياً</div>
+          <div class="j-d">الوردية انتهت. لا تقارير يدوية، لا مكالمات طارئة. النظام استبق 3 انقطاعات وأنتج التقرير تلقائياً. <strong>عبدالرحمن يراقب — التقنية هي التي تعمل.</strong></div>
+          <div class="j-ins ins-o"><div class="ins-ico">🎯</div><div><strong style="color:var(--ok)">رسالة مستقبل العمل:</strong> الذكاء الاصطناعي يُحرّر المهندس من المراقبة اليدوية ليُركّز على القرارات الاستراتيجية.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTONOMY BANNER -->
+  <div class="ab">
+    <div class="ab-ico">🏥</div>
+    <div>
+      <div class="ab-lbl">التأثير الاجتماعي المباشر</div>
+      <div class="ab-h">لأن TowerGuard تنبأ بالعطل قبل وقوعه بـ <em>4 ساعات</em>…</div>
+      <div class="ab-d">
+        استطاعت <strong>د. سارة</strong> — طبيبة الجراحة عن بُعد في مستشفى الملك فهد —
+        إجراء عملية جراحية دقيقة في الفجر <strong>دون انقطاع ثانية واحدة.</strong><br><br>
+        عبدالرحمن لم يتحدث معها. لم يعرف باسمها. لكن قراره الاستباقي الساعة 10:30 مساءً
+        أنقذ عملية جراحية بعد أربع ساعات. <strong>هذا هو أثر مستقبل العمل الرقمي.</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="div">
+
+<!-- BA -->
+<section class="sec fi">
+  <div class="sec-lbl">قبل وبعد · Before & After</div>
+  <h2 class="sec-h">من <em>ردّ الفعل</em> إلى <em>الاستباق</em></h2>
+  <div class="ba-g">
+    <div class="ba ba-b">
+      <div class="ba-lbl d">❌ بدون TowerGuard — ردّ الفعل</div>
+      <div class="ba-row"><span>🔴</span><span>الانقطاع يُكتشف من شكاوى مستخدمين <strong>بعد 15-45 دقيقة</strong></span></div>
+      <div class="ba-row"><span>🔴</span><span>د. سارة تُوقف الجراحة فجأة — <strong>خطر على المريض</strong></span></div>
+      <div class="ba-row"><span>🔴</span><span>المصنع الذكي يتوقف 47 دقيقة — <strong>خسارة 45,000+ ريال</strong></span></div>
+      <div class="ba-row"><span>🔴</span><span>10 مهندسين يراقبون يدوياً على مدار الساعة</span></div>
+      <div class="ba-row"><span>🔴</span><span>رحلات صيانة طارئة مكلفة <strong>بعد</strong> الانقطاع</span></div>
+    </div>
+    <div class="ba ba-a">
+      <div class="ba-lbl o">✅ مع TowerGuard — الاستباق</div>
+      <div class="ba-row"><span>🟢</span><span>التنبيه يصل <strong>قبل الانقطاع بـ 45 دقيقة</strong></span></div>
+      <div class="ba-row"><span>🟢</span><span>د. سارة تُكمل الجراحة <strong>دون انقطاع ثانية</strong></span></div>
+      <div class="ba-row"><span>🟢</span><span>المصنع الذكي لا يتوقف — <strong>صفر دقيقة خسارة</strong></span></div>
+      <div class="ba-row"><span>🟢</span><span><strong>مهندس واحد</strong> يُدير 10,011 برج من شاشة واحدة</span></div>
+      <div class="ba-row"><span>🟢</span><span>الفريق يذهب مرة مجدولة <strong>بدلاً من 3 رحلات طارئة</strong></span></div>
+    </div>
+  </div>
+</section>
+
+<hr class="div">
+
+<!-- HUB -->
+<section class="sec fi">
+  <div class="sec-lbl">التجربة المباشرة · Explore the Product</div>
+  <h2 class="sec-h">خمس واجهات — <em>منتج متكامل</em></h2>
+  <p class="sec-sub">كل واجهة تخدم مستخدماً مختلفاً. اختر خطوتك التالية.</p>
+  <div class="hub-g">
+    <a href="tower-map.html" class="hub" target="_blank">
+      <div class="hub-n">الخريطة السيادية</div><div class="hub-ico">🗺️</div>
+      <div class="hub-t">خريطة الأبراج</div>
+      <div class="hub-d">10,011 برج حي على الخريطة — حالة فورية، تصفية جغرافية، تفاصيل كاملة.</div>
+      <div class="hub-tag">ابدأ هنا</div><div class="hub-arr">←</div>
+    </a>
+    <a href="tower-predictor.html" class="hub" target="_blank">
+      <div class="hub-n">الذكاء الاصطناعي</div><div class="hub-ico">🧠</div>
+      <div class="hub-t">لوحة التنبؤ</div>
+      <div class="hub-d">أدخل بيانات البرج واشهد ICP 90% في الوقت الفعلي.</div>
+      <div class="hub-tag">تفاعل مباشر</div><div class="hub-arr">←</div>
+    </a>
+    <a href="device-simulation.html" class="hub" target="_blank">
+      <div class="hub-n">الحافة · Edge</div><div class="hub-ico">📟</div>
+      <div class="hub-t">محاكاة ESP32</div>
+      <div class="hub-d">شاهد الجهاز المادي: LEDs، Serial Monitor، Dead Man's Switch حياً.</div>
+      <div class="hub-tag">Hardware Demo</div><div class="hub-arr">←</div>
+    </a>
+    <a href="tower-map.html" class="hub" target="_blank">
+      <div class="hub-n">السيادة الرقمية</div><div class="hub-ico">🗺️</div>
+      <div class="hub-t">خريطة 10,011 برج</div>
+      <div class="hub-d">GIS تفاعلي لجميع الأبراج السعودية الحقيقية — OpenCelliD MCC=420.</div>
+      <div class="hub-tag">Real KSA Data</div><div class="hub-arr">←</div>
+    </a>
+    <a href="market.html" class="hub" target="_blank">
+      <div class="hub-n">الجدوى</div><div class="hub-ico">💼</div>
+      <div class="hub-t">دراسة الجدوى</div>
+      <div class="hub-d">ROI تفصيلي يشمل OPEX الكامل + 12.6M ريال SIM + مقارنة المنافسين.</div>
+      <div class="hub-tag">Business Case</div><div class="hub-arr">←</div>
+    </a>
+  </div>
+</section>
+
+<hr class="div">
+
+<!-- TRUST SEALS -->
+<section class="trust-sec fi">
+  <div class="trust-in">
+    <div class="sec-lbl">أختام الثقة · Trust & Compliance Signals</div>
+    <h2 class="sec-h">لا مجال للشك —<br><em>تقني أو تنظيمي أو مالي</em></h2>
+    <div class="trust-g">
+
+      <div class="seal seal-nca">
+        <div class="seal-hdr"><div class="seal-ico">🏛️</div><div class="seal-lbl">ختم السيادة الوطنية</div></div>
+        <div class="seal-t">الأمن السيبراني الوطني · NCA ECC-1:2018</div>
+        <div class="seal-d">متوافق مع <strong>ضوابط الأمن السيبراني الوطنية §3.3.5</strong>. جميع البيانات تُعالَج حصرياً داخل المملكة عبر <strong>STC Cloud — الرياض</strong>. لا بيانات تغادر السيادة الوطنية.<br><br>تشفير TLS 1.3 · Zero-Trust Architecture · SHA-256 لسلامة نموذج ML.</div>
+        <div class="seal-stmp">✅ NCA ECC-1:2018 §3.3.5 — Compliant</div>
+      </div>
+
+      <div class="seal seal-fin">
+        <div class="seal-hdr"><div class="seal-ico">📊</div><div class="seal-lbl">ختم الدقة المالية</div></div>
+        <div class="seal-t">دراسة جدوى واقعية شاملة OPEX الكامل</div>
+        <div class="seal-d">تكاليف التشغيل مُدرَجة بالكامل: <strong>12.6M ريال/سنة لـ 10,011 شريحة M2M</strong> (105 ريال/برج/شهر × 12).<br><br>صافي العائد بعد كل التكاليف: <strong>185 ريال/برج/سنة</strong>. المصدر: GSMA Intelligence + CITC.</div>
+        <div class="seal-stmp">✅ OPEX Full Disclosure · No Hidden Costs</div>
+      </div>
+
+      <div class="seal seal-citc">
+        <div class="seal-hdr"><div class="seal-ico">📡</div><div class="seal-lbl">ختم الاعتماد النوعي</div></div>
+        <div class="seal-t">SIM7600SA-H — معتمد وطنياً من CITC</div>
+        <div class="seal-d">النظام يعتمد <strong>SIM7600SA-H</strong> المعتمد رسمياً من هيئة الاتصالات للعمل على <strong>LTE-FDD وLTE-TDD</strong> السعودية.<br><br>يضمن التوافق مع STC وMobily وZain. معيار SMS: 3GPP TS 23.040.</div>
+        <div class="seal-stmp">✅ CITC Type Approved · PDPL Article 4</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="ft-brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16M12 4v16M8 8l4-4 4 4M6 16l6-4 6 4"/></svg>
+    TowerGuard — Saudi Sovereign Digital Twin Prototype
+  </div>
+  <div>هاكاثون طويق · مستقبل العمل · 2026</div>
+  <div>NCA ECC-1:2018 · PDPL · CITC · OpenCelliD · STC Cloud Riyadh</div>
+</footer>
+
+<script>
+setInterval(()=>{document.getElementById('clk').textContent=new Date().toLocaleTimeString('ar-SA',{hour12:false})},1000);
+const fi=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis')})},{threshold:.08});
+document.querySelectorAll('.fi').forEach(el=>fi.observe(el));
+const jo=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.querySelectorAll('.j-step').forEach(s=>setTimeout(()=>s.classList.add('vis'),parseInt(s.dataset.delay||0)))})},{threshold:.04});
+document.querySelectorAll('.j-wrap').forEach(el=>jo.observe(el));
+</script>
+</body>
+</html>

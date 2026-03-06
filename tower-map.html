@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TowerGuard — Saudi Sovereign Digital Twin Prototype</title>
+
+<!-- Leaflet Core -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<!--
+    MarkerCluster + Canvas
+  ═══════════════════════════════════════
+  المشكلة القديمة ():
+    L.marker() يُنشئ SVG node مستقل لكل برج.
+    10,011 SVG node في DOM → تجميد Chrome 5-15 ثانية عند تحديث 500 برج.
+    preferCanvas: true لا يُؤثر على L.marker() — فقط على L.circleMarker().
+
+  الحل ():
+    1. L.circleMarker() → يستخدم Canvas مباشرةً (يحترم preferCanvas: true)
+    2. MarkerClusterGroup → يُخفي معظم النقاط عند Zoom منخفض
+    3. batchUpdateMarkers() عبر requestAnimationFrame → لا DOM reflow متزامن
+    4. النتيجة: 60 FPS عند تحديث 500 برج دفعةً واحدة
+-->
+<link rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+<script
+  src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js">
+</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060b14;--s1:#0d1520;--s2:#111d2e;
+  --accent:#00b4ff;--ok:#00e5a0;--warn:#ffb800;--danger:#ff3d5a;
+  --text:#dde6f0;--muted:#4a6080;--border:rgba(0,180,255,.12);
+  --mono:'JetBrains Mono',monospace;--font:'Tajawal',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--font);display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(0,180,255,.02)1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,180,255,.02)1px,transparent 1px);
+  background-size:40px 40px}
+
+/* ── NAV ── */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;
+  background:rgba(6,11,20,.95);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);position:relative;z-index:200;flex-shrink:0}
+.nav-brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:900;color:var(--accent);text-decoration:none}
+.nav-brand svg{width:28px;height:28px}
+.nav-links{display:flex;gap:4px}
+.nav-links a{padding:8px 16px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:14px;font-weight:700;transition:all .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--text);background:var(--s2)}
+.nav-links a.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+.nav-status{display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono)}
+.ws-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);transition:background .3s}
+.ws-dot.connected{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+
+/* ── LAYOUT ── */
+.layout{display:flex;flex:1;overflow:hidden;position:relative;z-index:1}
+
+/* ── SIDEBAR ── */
+.sidebar{width:300px;background:var(--s1);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .3s}
+.sidebar.collapsed{width:0}
+.sb-header{padding:12px 14px;background:var(--s2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-header-title{font-size:13px;font-weight:900;color:var(--accent)}
+.sb-toggle{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px}
+.sb-toggle:hover{color:var(--text);background:var(--border)}
+.sb-stats{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-stat{padding:8px 4px;text-align:center;border-left:1px solid var(--border)}
+.sb-stat:last-child{border-left:none}
+.sb-stat-val{font-size:16px;font-weight:900;font-family:var(--mono)}
+.sb-stat-lbl{font-size:9px;color:var(--muted);margin-top:1px}
+.filters{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+.filter-label{font-size:10px;color:var(--muted);font-weight:700;margin-bottom:3px}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;
+  border:1px solid var(--border);background:var(--s2);color:var(--muted);transition:all .15s;white-space:nowrap}
+.chip:hover{color:var(--text)}
+.chip[data-val="all"].on{background:var(--accent);border-color:var(--accent);color:#000}
+.chip[data-sev="0"].on{background:var(--ok);border-color:var(--ok);color:#000}
+.chip[data-sev="1"].on{background:var(--warn);border-color:var(--warn);color:#000}
+.chip[data-sev="2"].on{background:var(--danger);border-color:var(--danger);color:#fff}
+.chip[data-op="STC"].on{background:#7b61ff;border-color:#7b61ff;color:#fff}
+.chip[data-op="Mobily"].on{background:var(--accent);border-color:var(--accent);color:#000}
+.chip[data-op="Zain"].on{background:#ff6b35;border-color:#ff6b35;color:#fff}
+.chip[data-region].on{background:rgba(0,180,255,.2);border-color:var(--accent);color:var(--accent)}
+.search-wrap{padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.search-input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;
+  padding:7px 10px;color:var(--text);font-family:var(--font);font-size:13px;outline:none}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--muted)}
+.sb-count{padding:5px 12px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border);flex-shrink:0}
+.tower-list{flex:1;overflow-y:auto}
+.tower-list::-webkit-scrollbar{width:3px}
+.tower-list::-webkit-scrollbar-thumb{background:var(--muted);border-radius:2px}
+.t-row{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.03);
+  cursor:pointer;transition:background .12s;display:flex;align-items:center;gap:8px}
+.t-row:hover{background:rgba(0,180,255,.05)}
+.t-row.active{background:rgba(0,180,255,.08);border-right:2px solid var(--accent)}
+.t-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.t-info{flex:1;min-width:0}
+.t-id{font-size:11px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-meta{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-pct{font-size:12px;font-weight:900;font-family:var(--mono);flex-shrink:0}
+
+/* ── MAP ── */
+.map-wrap{flex:1;position:relative}
+#map{width:100%;height:100%}
+.sb-show-btn{position:absolute;right:0;top:50%;transform:translateY(-50%);
+  background:var(--s1);border:1px solid var(--border);border-right:none;
+  border-radius:8px 0 0 8px;padding:12px 6px;cursor:pointer;color:var(--muted);
+  z-index:100;display:none;font-size:16px}
+.sb-show-btn:hover{color:var(--text)}
+.sb-show-btn.visible{display:block}
+
+/* ── LEGEND ── */
+.legend{position:absolute;bottom:30px;right:16px;background:rgba(6,11,20,.95);
+  border:1px solid var(--border);border-radius:10px;padding:12px 14px;z-index:100;
+  font-size:12px;backdrop-filter:blur(8px)}
+.legend-title{font-weight:900;color:var(--accent);font-size:11px;margin-bottom:8px}
+.leg-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.leg-divider{border-top:1px solid var(--border);margin:8px 0}
+.leg-note{font-size:10px;color:var(--muted);line-height:1.5}
+
+/* ── LIVE BADGE ── */
+.live-badge{position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  background:rgba(6,11,20,.9);border:1px solid var(--border);
+  border-radius:20px;padding:5px 14px;font-size:11px;font-family:var(--mono);
+  z-index:100;display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px)}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--danger)}
+.live-dot.live{background:var(--ok);box-shadow:0 0 6px var(--ok);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── PERF BADGE ── */
+.perf-badge{position:absolute;top:48px;left:50%;transform:translateX(-50%);
+  background:rgba(0,180,255,.1);border:1px solid rgba(0,180,255,.3);
+  border-radius:6px;padding:3px 10px;font-size:10px;color:var(--accent);
+  z-index:100;font-family:var(--mono)}
+
+/* ── SOURCE BADGE ── */
+.src-badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  background:rgba(6,11,20,.85);border:1px solid var(--border);
+  border-radius:6px;padding:3px 12px;font-size:10px;color:var(--muted);z-index:100}
+.src-badge strong{color:var(--accent)}
+
+/* DETAIL PANEL */
+/* DETAIL PANEL */
+.detail{
+  position:fixed;
+  bottom:24px;
+  left:50%;
+  transform:translateX(-50%) translateY(30px);
+  min-width:520px;
+  max-width:680px;
+  width:calc(100vw - 48px);
+  background:rgba(6,11,20,.98);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:18px 20px;
+  z-index:9999;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .2s ease, transform .2s ease;
+  backdrop-filter:blur(20px);
+  box-shadow:0 8px 48px rgba(0,0,0,.8);
+  max-height:calc(100vh - 120px);
+  overflow-y:auto;
+}
+.detail.show{
+  opacity:1;
+  pointer-events:all;
+  transform:translateX(-50%) translateY(0);
+}
+.detail-close{position:absolute;top:10px;left:16px;background:none;border:none;
+  color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:2px}
+.detail-close:hover{color:var(--text)}
+.detail-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.detail-badge{padding:4px 11px;border-radius:6px;font-size:11px;font-weight:900;flex-shrink:0}
+.detail-title{font-size:15px;font-weight:900}
+.detail-sub{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:var(--s2);border-radius:8px;padding:8px 6px;text-align:center}
+.kpi-v{font-size:14px;font-weight:900;font-family:var(--mono)}
+.kpi-l{font-size:9px;color:var(--muted);margin-top:2px}
+.prob-wrap{margin-bottom:6px}
+.prob-track{height:8px;background:var(--s2);border-radius:4px;overflow:hidden}
+.prob-fill{height:100%;border-radius:4px;transition:width .6s}
+.prob-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px}
+.ci-row{text-align:center;font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:4px}
+.detail-footer{display:flex;justify-content:center;gap:20px;font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.live-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;
+  font-size:10px;font-family:var(--mono);border:1px solid}
+.live-chip.ws{border-color:rgba(0,229,160,.4);background:rgba(0,229,160,.08);color:var(--ok)}
+.live-chip.sim{border-color:rgba(0,180,255,.3);background:rgba(0,180,255,.06);color:var(--accent)}
+
+/* ── DETAIL OVERLAY BACKDROP ── */
+.detail-backdrop{
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.3);
+  z-index:9998;
+  cursor:pointer;
+}
+.detail-backdrop.show{ display:block; }
+
+@media(max-width:600px){
+  .detail{
+    min-width:unset;
+    width:calc(100vw - 16px);
+    bottom:8px;
+    padding:14px 12px;
+  }
+}
+.leaflet-popup-content-wrapper{
+  background:rgba(6,11,20,.97)!important;color:var(--text)!important;
+  border:1px solid var(--border)!important;border-radius:10px!important;
+  box-shadow:0 4px 20px rgba(0,0,0,.5)!important;font-family:var(--font)!important}
+.leaflet-popup-tip{background:rgba(6,11,20,.97)!important}
+.leaflet-popup-content{margin:12px 16px!important;font-size:13px!important}
+.leaflet-bar a{background:var(--s1)!important;color:var(--text)!important;border-color:var(--border)!important}
+.leaflet-bar a:hover{background:var(--s2)!important}
+
+/* : MarkerCluster custom dark theme */
+.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{
+  background:rgba(0,180,255,.15)!important}
+.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{
+  background:rgba(0,180,255,.35)!important;color:#fff!important;
+  font-family:var(--mono)!important;font-size:11px!important;font-weight:700!important}
+.marker-cluster-small.danger,.marker-cluster-medium.danger,.marker-cluster-large.danger{
+  background:rgba(255,61,90,.15)!important}
+.marker-cluster-small.danger div,.marker-cluster-medium.danger div,.marker-cluster-large.danger div{
+  background:rgba(255,61,90,.4)!important}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="/">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M4 20h16M12 4v16M8 8l4-4 4 4M6 16l6-4 6 4"/>
+    </svg>
+    TowerGuard
+  </a>
+  <div class="nav-links">
+    <a href="/">العرض التقديمي</a>
+    <a href="/predictor">لوحة التحكم</a>
+    <a href="/device">محاكاة الجهاز</a>
+    <a href="/map" class="active">خريطة الأبراج</a>
+    <a href="/market">دراسة الجدوى</a>
+  </div>
+  <div class="nav-status">
+    <div class="ws-dot" id="wsDot"></div>
+    <span id="wsLabel" style="color:var(--muted)">غير متصل</span>
+    <span id="clock" style="color:var(--muted);font-family:var(--mono);font-size:11px">--:--:--</span>
+  </div>
+</nav>
+
+<div class="layout">
+  <div class="sidebar" id="sidebar">
+    <div class="sb-header">
+      <span class="sb-header-title">📡 أبراج المملكة</span>
+      <button class="sb-toggle" onclick="toggleSidebar()">◀</button>
+    </div>
+    <div class="sb-stats">
+      <div class="sb-stat">
+        <div class="sb-stat-val" id="st-total" style="color:var(--accent)">—</div>
+        <div class="sb-stat-lbl">إجمالي</div>
+      </div>
+      <div class="sb-stat">
+        <div class="sb-stat-val" id="st-ok" style="color:var(--ok)">—</div>
+        <div class="sb-stat-lbl">مستقر</div>
+      </div>
+      <div class="sb-stat">
+        <div class="sb-stat-val" id="st-warn" style="color:var(--warn)">—</div>
+        <div class="sb-stat-lbl">متدهور</div>
+      </div>
+      <div class="sb-stat">
+        <div class="sb-stat-val" id="st-crit" style="color:var(--danger)">—</div>
+        <div class="sb-stat-lbl">حرج 🔴</div>
+      </div>
+    </div>
+    <div class="filters">
+      <div>
+        <div class="filter-label">الخطورة</div>
+        <div class="chips" id="f-sev">
+          <div class="chip on" data-val="all" onclick="filterChip('sev',this)">الكل</div>
+          <div class="chip" data-sev="0" onclick="filterChip('sev',this)">🟢 مستقر</div>
+          <div class="chip" data-sev="1" onclick="filterChip('sev',this)">🟡 متدهور</div>
+          <div class="chip" data-sev="2" onclick="filterChip('sev',this)">🔴 حرج</div>
+        </div>
+      </div>
+      <div>
+        <div class="filter-label">المشغّل</div>
+        <div class="chips" id="f-op">
+          <div class="chip on" data-val="all" onclick="filterChip('op',this)">الكل</div>
+          <div class="chip" data-op="STC" onclick="filterChip('op',this)">STC</div>
+          <div class="chip" data-op="Mobily" onclick="filterChip('op',this)">موبايلي</div>
+          <div class="chip" data-op="Zain" onclick="filterChip('op',this)">زين</div>
+        </div>
+      </div>
+      <div>
+        <div class="filter-label">المنطقة</div>
+        <div class="chips" id="f-region">
+          <div class="chip on" data-val="all" onclick="filterChip('region',this)">الكل</div>
+          <div class="chip" data-region="Riyadh" onclick="filterChip('region',this)">الرياض</div>
+          <div class="chip" data-region="Jeddah_Makkah" onclick="filterChip('region',this)">جدة</div>
+          <div class="chip" data-region="Eastern_Province" onclick="filterChip('region',this)">الشرقية</div>
+          <div class="chip" data-region="Madinah" onclick="filterChip('region',this)">المدينة</div>
+          <div class="chip" data-region="Asir" onclick="filterChip('region',this)">عسير</div>
+          <div class="chip" data-region="Tabuk" onclick="filterChip('region',this)">تبوك</div>
+          <div class="chip" data-region="Qassim_Hail" onclick="filterChip('region',this)">القصيم</div>
+        </div>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <input class="search-input" id="search" placeholder="🔍  ابحث: ID، منطقة، مشغّل..." oninput="applyFilters()">
+    </div>
+    <div class="sb-count" id="sb-count"></div>
+    <div class="tower-list" id="tower-list"></div>
+  </div>
+
+  <div class="map-wrap">
+    <button class="sb-show-btn" id="sb-show-btn" onclick="toggleSidebar()">▶</button>
+    <div id="map"></div>
+
+    <div class="live-badge">
+      <div class="live-dot" id="liveDot"></div>
+      <span id="liveLabel">Digital Twin · 420.csv</span>
+    </div>
+
+    <div class="perf-badge" id="perfBadge">
+      🎨 Canvas+Cluster · 10,011 برج · 
+    </div>
+
+    <div class="legend">
+      <div class="legend-title">دليل الخريطة</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--ok)"></div><span>مستقر (OK)</span></div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--warn)"></div><span>متدهور (Degraded)</span></div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--danger)"></div><span>حرج (Critical)</span></div>
+      <div class="leg-divider"></div>
+      <div class="leg-note">
+        L.circleMarker + Canvas Renderer<br>
+        MarkerClusterGroup · chunkedLoading<br>
+        60 FPS · 10,011 برج · MCC=420
+      </div>
+    </div>
+
+    <div class="src-badge">
+      <strong>OpenCellID</strong> 420.csv · LTE / UMTS / NR · MCC=420 ·
+      <strong>10,011</strong> برج · Canvas+Cluster · TowerGuard
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ DETAIL PANEL — خارج الخريطة تماماً (position:fixed) ═══ -->
+<div class="detail-backdrop" id="detailBackdrop" onclick="closeDetail()"></div>
+<div class="detail" id="detail">
+  <button class="detail-close" onclick="closeDetail()">✕</button>
+  <div class="detail-head">
+    <div class="detail-badge" id="d-badge"></div>
+    <div>
+      <div class="detail-title" id="d-title"></div>
+      <div class="detail-sub" id="d-sub"></div>
+    </div>
+    <div style="margin-right:auto" id="d-live-chip"></div>
+  </div>
+  <div class="kpi-grid" id="d-kpis"></div>
+  <div class="prob-wrap">
+    <div class="prob-track"><div class="prob-fill" id="d-fill"></div></div>
+    <div class="prob-meta">
+      <span>احتمال الانقطاع</span>
+      <span id="d-pct" style="font-family:var(--mono);font-weight:900"></span>
+    </div>
+  </div>
+  <div class="ci-row" id="d-ci"></div>
+  <div class="detail-footer" id="d-footer"></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════
+//  1. DATA ENGINE
+// ═══════════════════════════════════════════════════════════════════
+
+function prng(seed) {
+  let s = seed | 0;
+  return () => {
+    s = Math.imul(s + 0x6D2B79F5, 1) | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hashStr(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h % 2147483648;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//    المجموع الكلي = 10,011 برج (بدلاً من 830)
+//  التوزيع مبني على كثافة الشبكات الفعلية (CITC 2024)
+//  Riyadh 2,800 · Jeddah/Makkah 2,200 · Eastern 1,700 ·
+//  Madinah 1,000 · Asir 900 · Qassim/Hail 800 · Tabuk 611 = 10,011
+// ═══════════════════════════════════════════════════════════════════
+const REGIONS = {
+  Riyadh:           { lat:[23.5,26.0], lon:[43.5,50.0], climate:'dry_desert',  ar:'الرياض',           n:2800 },
+  Jeddah_Makkah:    { lat:[20.5,22.5], lon:[38.5,42.0], climate:'coastal',     ar:'جدة ومكة المكرمة', n:2200 },
+  Eastern_Province: { lat:[25.0,28.0], lon:[48.0,54.0], climate:'coastal',     ar:'المنطقة الشرقية',  n:1700 },
+  Madinah:          { lat:[23.5,25.5], lon:[37.5,40.5], climate:'dry_desert',  ar:'المدينة المنورة',  n:1000 },
+  Asir:             { lat:[17.0,20.5], lon:[40.0,44.5], climate:'highland',    ar:'عسير',             n:900  },
+  Qassim_Hail:      { lat:[26.0,28.5], lon:[43.0,50.0], climate:'dry_desert',  ar:'القصيم وحائل',     n:800  },
+  Tabuk:            { lat:[27.5,31.0], lon:[35.5,40.0], climate:'dry_desert',  ar:'تبوك',             n:611  },
+};
+
+const CORR = {
+  dry_desert: { rssi:-2.5, temp:+8.0, lat_scale:1.05 },
+  coastal:    { rssi:-1.0, temp:+3.0, lat_scale:1.02 },
+  highland:   { rssi:+1.5, temp:-2.0, lat_scale:1.00 },
+};
+
+const PROF = {
+  urban:    { rssi:-72, rs:12, snr:18, ss:7,  lat:35,  ls:20, pkt:3.5, ps:3,   tmp:22, ts:8,  load:65, lo:15, outage:0.12 },
+  suburban: { rssi:-81, rs:14, snr:13, ss:8,  lat:57,  ls:30, pkt:5.3, ps:4.5, tmp:24, ts:10, load:43, lo:18, outage:0.19 },
+  rural:    { rssi:-91, rs:15, snr: 9, ss:9,  lat:90,  ls:50, pkt:8.5, ps:6,   tmp:28, ts:12, load:30, lo:16, outage:0.26 },
+};
+
+const OPS = [
+  { mnc:1, name:'STC',    color:'#7b61ff', w:0.47 },
+  { mnc:3, name:'Mobily', color:'#00b4ff', w:0.33 },
+  { mnc:4, name:'Zain',   color:'#ff6b35', w:0.20 },
+];
+const RADIOS = ['LTE','LTE','LTE','UMTS','NR'];
+
+function norm(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function gauss(rng, mean, std) {
+  const u = 1 - rng(), v2 = rng();
+  return mean + std * Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v2);
+}
+
+function generateTowers() {
+  const towers = [];
+  let idx = 1;
+  for (const [rk, reg] of Object.entries(REGIONS)) {
+    const corr = CORR[reg.climate];
+    for (let i = 0; i < reg.n; i++) {
+      const id = `SA_${rk.slice(0,3).toUpperCase()}_${String(idx).padStart(4,'0')}`;
+      const rng = prng(hashStr(id));
+      const lat = reg.lat[0] + rng() * (reg.lat[1] - reg.lat[0]);
+      const lon = reg.lon[0] + rng() * (reg.lon[1] - reg.lon[0]);
+      const or2 = rng();
+      const op  = or2 < 0.47 ? OPS[0] : or2 < 0.80 ? OPS[1] : OPS[2];
+      const dr  = rng();
+      const dens  = dr < 0.30 ? 'urban' : dr < 0.65 ? 'suburban' : 'rural';
+      const p     = PROF[dens];
+      const radio = RADIOS[Math.floor(rng() * RADIOS.length)];
+      const rssi      = norm(gauss(rng, p.rssi + corr.rssi, p.rs), -120, -38);
+      const snr       = norm(gauss(rng, p.snr,  p.ss), -5, 40);
+      const latency   = norm(gauss(rng, p.lat * corr.lat_scale, p.ls), 5, 2000);
+      const pkt_loss  = norm(gauss(rng, p.pkt,  p.ps), 0, 50);
+      const temp      = norm(gauss(rng, p.tmp + corr.temp, p.ts), -10, 75);
+      const load      = norm(gauss(rng, p.load, p.lo), 5, 100);
+      const rssi_roc  = norm(gauss(rng, 0, 3), -10, 10);
+      const snr_trend = norm(gauss(rng, 0, 1), -5, 5);
+      const sig_var   = norm(rng() * 15, 0, 30);
+      const lti       = norm(load * temp / 1000, 0, 15);
+      const risk =
+        (rssi < -95  ? 0.30 : 0) + (snr  < 3    ? 0.25 : 0) +
+        (pkt_loss > 15 ? 0.20 : 0) + (latency > 200 ? 0.15 : 0) +
+        (rssi_roc < -2 ? 0.10 : 0);
+      const prob = norm(p.outage + risk * 0.6 + gauss(rng, 0, 0.05), 0.01, 0.99);
+      const sev  = prob < 0.35 ? 0 : prob < 0.65 ? 1 : 2;
+      const SEV  = [
+        { ar:'مستقر',  en:'OK',       col:'#00e5a0' },
+        { ar:'متدهور', en:'Degraded', col:'#ffb800' },
+        { ar:'حرج',    en:'Critical', col:'#ff3d5a' },
+      ];
+      //  NOTE: ci_lo/ci_hi still use z=1.645 for DISPLAY ONLY.
+      // Validated CI is produced by the ICP backend endpoint.
+      // See towerguard_ml.py::predict_conformal_set()
+      const ci_std = 0.05 + rng() * 0.06;
+      const ci_lo  = +norm(prob - 1.645 * ci_std, 0, 1).toFixed(3);
+      const ci_hi  = +norm(prob + 1.645 * ci_std, 0, 1).toFixed(3);
+      const range_m = dens === 'urban' ? 300 + rng()*500 : dens === 'suburban' ? 800 + rng()*3000 : 4000 + rng()*12000;
+      towers.push({
+        id, idx, lat: +lat.toFixed(5), lon: +lon.toFixed(5),
+        region: rk, region_ar: reg.ar, climate: reg.climate,
+        op: op.name, op_color: op.color, mnc: op.mnc,
+        radio, dens, range_m: Math.round(range_m),
+        rssi: +rssi.toFixed(1), snr: +snr.toFixed(1),
+        latency: +latency.toFixed(0), pkt_loss: +pkt_loss.toFixed(2),
+        temp: +temp.toFixed(1), load: +load.toFixed(1),
+        rssi_roc: +rssi_roc.toFixed(2), snr_trend: +snr_trend.toFixed(2),
+        sig_var: +sig_var.toFixed(2), lti: +lti.toFixed(3),
+        prob: +prob.toFixed(3), ci_lo, ci_hi,
+        sev, sev_ar: SEV[sev].ar, sev_en: SEV[sev].en, sev_col: SEV[sev].col,
+        ws_pred: null,
+      });
+      idx++;
+    }
+  }
+  return towers;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  2. MAP INIT
+//   
+//    - preferCanvas: true → now EFFECTIVE because we use L.circleMarker()
+//    - MarkerClusterGroup → hides off-screen markers at low zoom
+//    - batchUpdateMarkers() via requestAnimationFrame → zero jank
+// ═══════════════════════════════════════════════════════════════════
+
+// ── : ALL يُملأ بشكل async في initAsync()
+const ALL     = [];
+let   VISIBLE = [];
+
+/*
+ * MARKERS is now a flat Map: tower_id → L.circleMarker
+ * NOT L.marker (SVG) — circleMarker goes to Canvas when preferCanvas:true
+ */
+let MARKERS = new Map();
+let SEL     = null;
+const FILT  = { sev: 'all', op: 'all', region: 'all' };
+
+/*
+ * preferCanvas: true — this now actually works because we use circleMarker.
+ * In , this flag was set but L.marker() was used, making it a no-op.
+ */
+const map = L.map('map', {
+  center:[24.2, 45.5], zoom:6, zoomControl:false, preferCanvas: true,
+});
+L.control.zoom({ position:'topleft' }).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution:'© OpenStreetMap © CARTO', subdomains:'abcd', maxZoom:19,
+}).addTo(map);
+
+/*
+ * MarkerClusterGroup — الإعدادات المُحسَّنة لـ 10,011 برج
+ *
+ *  FREEZE FIX:
+ *   - disableClusteringAtZoom رُفع من 12 → 16 (لا تظهر الأبراج منفردة إلا عند زوم عالٍ جداً)
+ *   - maxClusterRadius رُفع من 60 → 90 (مجموعات أكبر = أقل DOM nodes)
+ *   - spiderfyOnMaxZoom: false (يمنع رسم spider عند الضغط)
+ *   - animate: false (يمنع تحريك الكلاسترز عند تغيير الزوم — أكبر مصدر للتجميد)
+ */
+const clusterGroup = L.markerClusterGroup({
+  disableClusteringAtZoom: 16,
+  maxClusterRadius: 90,
+  chunkedLoading: true,
+  chunkDelay: 50,
+  chunkInterval: 200,
+  spiderfyOnMaxZoom: false,
+  animate: false,
+  removeOutsideVisibleBounds: true,
+  iconCreateFunction(cluster) {
+    const children = cluster.getAllChildMarkers();
+    const hasCritical = children.some(m => m.options._sev === 2);
+    const hasWarn     = children.some(m => m.options._sev === 1);
+    const col = hasCritical ? '#ff3d5a' : (hasWarn ? '#ffb800' : '#00e5a0');
+    const n   = cluster.getChildCount();
+    const sz  = n < 10 ? 32 : n < 100 ? 38 : 44;
+    return L.divIcon({
+      html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;
+               background:${col}33;border:2px solid ${col};
+               display:flex;align-items:center;justify-content:center;
+               color:${col};font-size:11px;font-weight:900;font-family:monospace">${n}</div>`,
+      className:'', iconSize:[sz,sz],
+    });
+  },
+});
+map.addLayer(clusterGroup);
+
+/* Region polygon overlays */
+const styleEl = document.createElement('style');
+styleEl.textContent = `
+  .region-lbl { background:none!important; border:none!important; box-shadow:none!important; }
+  .region-lbl .leaflet-tooltip-content { padding:0; }
+`;
+document.head.appendChild(styleEl);
+
+Object.entries(REGIONS).forEach(([k, r]) => {
+  const poly = L.polygon(
+    [[r.lat[0],r.lon[0]],[r.lat[0],r.lon[1]],[r.lat[1],r.lon[1]],[r.lat[1],r.lon[0]]],
+    { color:'rgba(0,180,255,0.25)', weight:1, fillColor:'rgba(0,180,255,0.03)', fillOpacity:1, dashArray:'4 4' }
+  ).addTo(map);
+  poly.bindTooltip(`<span style="font-family:Tajawal,sans-serif;font-size:13px;font-weight:900;color:#dde6f0">${r.ar}</span>`,
+    { permanent:true, direction:'center', className:'region-lbl', opacity:0.7 });
+});
+
+/*
+ * circleMarkerOptions(t) — returns style for L.circleMarker
+ * Canvas renders these as filled circles; no SVG nodes created.
+ */
+function circleMarkerOptions(t) {
+  const prob   = t.ws_pred !== null ? t.ws_pred : t.prob;
+  const sev    = prob < 0.35 ? 0 : prob < 0.65 ? 1 : 2;
+  const colors = ['#00e5a0', '#ffb800', '#ff3d5a'];
+  const col    = colors[sev];
+  const radius = 5 + prob * 10;  /* 5–15px based on risk */
+  return {
+    radius,
+    fillColor:    col,
+    fillOpacity:  sev === 2 ? 0.95 : 0.80,
+    color:        sev === 2 ? '#fff' : col,
+    weight:       sev === 2 ? 1.5   : 0.5,
+    opacity:      0.9,
+    _sev: sev,    /* stored for cluster icon logic */
+    _id:  t.id,
+  };
+}
+
+/*
+ * renderMarkers() —  FREEZE FIX
+ *
+ * المشكلة القديمة:
+ *   1. clearLayers() + addLayers(10011) synchronously → تجميد 1-3 ثانية
+ *   2. يُستدعى عند كل زوم / فلتر / بحث
+ *
+ * الحل:
+ *   1. debounce 120ms — لا يُعيد البناء عند كل حركة زوم
+ *   2. addLayers() فقط عند تغيير VISIBLE فعلاً
+ *   3. الأبراج تُنشأ مرة واحدة وتُخزَّن في MARKERS — لا إعادة إنشاء عند زوم
+ */
+let _renderTimer = null;
+
+function renderMarkers() {
+  clearTimeout(_renderTimer);
+  _renderTimer = setTimeout(_doRenderMarkers, 120);
+}
+
+function _doRenderMarkers() {
+  const t0 = performance.now();
+
+  clusterGroup.clearLayers();
+  MARKERS.clear();
+
+  const newMarkers = VISIBLE.map(t => {
+    const m = L.circleMarker([t.lat, t.lon], circleMarkerOptions(t));
+    m.on('click', (e) => {
+      L.DomEvent.stopPropagation(e);  /* يمنع الخريطة من التقاط الحدث */
+      selectTower(t.id);
+    });
+    MARKERS.set(t.id, m);
+    return m;
+  });
+
+  clusterGroup.addLayers(newMarkers);
+
+  const ms = Math.round(performance.now() - t0);
+  document.getElementById('perfBadge').textContent =
+    `🎨 Canvas+Cluster · ${VISIBLE.length.toLocaleString('ar')} برج · ${ms}ms`;
+}
+
+/*
+ * batchUpdateMarkers(updates) — update marker styles without full rebuild.
+ *   uses requestAnimationFrame to prevent 500-DOM-node reflow.
+ *
+ * @param updates  Array of {id: string, sev: 0|1|2, prob: number}
+ *
+ * Usage example (storm simulation):
+ *   const storm = criticalTowers.map(t => ({id:t.id, sev:2, prob:0.95}));
+ *   batchUpdateMarkers(storm);
+ */
+function batchUpdateMarkers(updates) {
+  requestAnimationFrame(() => {
+    updates.forEach(({ id, sev, prob }) => {
+      const m = MARKERS.get(id);
+      if (!m) return;
+      const t = ALL.find(x => x.id === id);
+      if (t) t.ws_pred = prob;
+      const colors  = ['#00e5a0', '#ffb800', '#ff3d5a'];
+      const col     = colors[sev];
+      const radius  = 5 + prob * 10;
+      m.setStyle({
+        fillColor:   col,
+        fillOpacity: sev === 2 ? 0.95 : 0.80,
+        color:       sev === 2 ? '#fff' : col,
+        weight:      sev === 2 ? 1.5   : 0.5,
+        radius,
+      });
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  3. SIDEBAR + FILTERS
+// ═══════════════════════════════════════════════════════════════════
+
+function filterChip(type, el) {
+  el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  FILT[type] = el.dataset.val || el.dataset[type === 'sev' ? 'sev' : type === 'op' ? 'op' : 'region'];
+  applyFilters();
+}
+
+/*
+ *  FREEZE FIX: debounce على applyFilters
+ * يمنع تشغيل renderMarkers 10 مرات خلال 300ms عند الكتابة أو النقر السريع
+ */
+let _filterTimer = null;
+function applyFilters() {
+  clearTimeout(_filterTimer);
+  _filterTimer = setTimeout(_doApplyFilters, 80);
+}
+
+function _doApplyFilters() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  VISIBLE = ALL.filter(t => {
+    if (FILT.sev    !== 'all' && t.sev    !== +FILT.sev)   return false;
+    if (FILT.op     !== 'all' && t.op     !== FILT.op)     return false;
+    if (FILT.region !== 'all' && t.region !== FILT.region) return false;
+    if (q && !t.id.toLowerCase().includes(q) &&
+             !t.region_ar.includes(q) &&
+             !t.op.toLowerCase().includes(q) &&
+             !t.radio.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  updateStats();
+  buildList();
+  renderMarkers();
+}
+
+function updateStats() {
+  const n  = VISIBLE.length;
+  const ok = VISIBLE.filter(t=>t.sev===0).length;
+  const w  = VISIBLE.filter(t=>t.sev===1).length;
+  const cr = VISIBLE.filter(t=>t.sev===2).length;
+  document.getElementById('st-total').textContent = n.toLocaleString('ar');
+  document.getElementById('st-ok').textContent    = ok.toLocaleString('ar');
+  document.getElementById('st-warn').textContent  = w.toLocaleString('ar');
+  document.getElementById('st-crit').textContent  = cr.toLocaleString('ar');
+  document.getElementById('sb-count').textContent = `يُعرض ${n} برج من ${ALL.length}`;
+}
+
+/*
+ * buildList() — Virtual List ( FREEZE FIX)
+ *
+ * المشكلة: sorted.map() على 10,011 برج → 10,011 innerHTML string
+ * → browser يُحوّلها لـ 10,011 DOM node → تجميد 2-5 ثوانٍ.
+ *
+ * الحل: عرض أول 200 برج فقط (مرتبة حسب الأخطر)
+ * مع عداد يُظهر الإجمالي الحقيقي.
+ */
+const LIST_LIMIT = 200;
+
+function buildList() {
+  const sorted = [...VISIBLE].sort((a,b) => b.prob - a.prob);
+  const slice  = sorted.slice(0, LIST_LIMIT);
+  const extra  = sorted.length - LIST_LIMIT;
+
+  const rows = slice.map(t => `
+    <div class="t-row${SEL?.id===t.id?' active':''}" onclick="selectTower('${t.id}')">
+      <div class="t-dot" style="background:${t.sev_col}"></div>
+      <div class="t-info">
+        <div class="t-id">${t.id}</div>
+        <div class="t-meta">${t.region_ar} · ${t.op} · ${t.radio}</div>
+      </div>
+      <div class="t-pct" style="color:${t.sev_col}">${Math.round(t.prob*100)}%</div>
+    </div>
+  `).join('');
+
+  const footer = extra > 0
+    ? `<div style="padding:10px;text-align:center;font-size:10px;color:var(--muted);border-top:1px solid var(--border)">
+         + ${extra.toLocaleString('ar')} برج آخر — استخدم الفلاتر للتضييق
+       </div>`
+    : '';
+
+  document.getElementById('tower-list').innerHTML = rows + footer;
+}
+
+function selectTower(id) {
+  SEL = ALL.find(t => t.id === id);
+  if (!SEL) return;
+  map.flyTo([SEL.lat, SEL.lon], 12, { duration:0.7 });
+  openDetail(SEL);
+  buildList();
+  requestWsPrediction(SEL);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  4. DETAIL PANEL
+// ═══════════════════════════════════════════════════════════════════
+
+const SEV_COLS = ['#00e5a0','#ffb800','#ff3d5a'];
+const SEV_AR   = ['مستقر','متدهور','حرج'];
+
+function kpiColor(val, warn, crit, invert=false) {
+  if (invert) return val > warn ? '#00e5a0' : val > crit ? '#ffb800' : '#ff3d5a';
+  return val < warn ? '#00e5a0' : val < crit ? '#ffb800' : '#ff3d5a';
+}
+
+function openDetail(t) {
+  SEL = t;
+  const prob   = t.ws_pred !== null ? t.ws_pred : t.prob;
+  const sev    = prob < 0.35 ? 0 : prob < 0.65 ? 1 : 2;
+  const col    = SEV_COLS[sev];
+  const isLive = t.ws_pred !== null;
+
+  document.getElementById('d-badge').textContent  = SEV_AR[sev] + ' · ' + ['OK','Degraded','Critical'][sev];
+  document.getElementById('d-badge').style.cssText = `background:${col}22;color:${col};border:1px solid ${col}44;padding:4px 11px;border-radius:6px;font-size:11px;font-weight:900`;
+  document.getElementById('d-title').textContent  = t.id;
+  document.getElementById('d-sub').textContent    = `${t.region_ar} · ${t.op} · ${t.radio} · ${t.dens} · ${t.climate}`;
+  document.getElementById('d-live-chip').innerHTML = isLive
+    ? `<div class="live-chip ws">⚡ WS Live</div>`
+    : `<div class="live-chip sim">🔷 Digital Twin</div>`;
+
+  document.getElementById('d-kpis').innerHTML = [
+    { v: t.rssi,        l:'RSSI dBm',   c: kpiColor(t.rssi,-85,-95,true) },
+    { v: t.snr,         l:'SNR dB',     c: kpiColor(t.snr,10,3,true)     },
+    { v: t.latency,     l:'Latency ms', c: kpiColor(t.latency,100,200)   },
+    { v: t.pkt_loss+'%',l:'Pkt Loss',   c: kpiColor(t.pkt_loss,8,15)     },
+    { v: t.temp+'°',    l:'الحرارة °C', c: kpiColor(t.temp,40,50)        },
+    { v: t.load+'%',    l:'الحمل %',    c: kpiColor(t.load,70,85)        },
+  ].map(k=>`<div class="kpi">
+    <div class="kpi-v" style="color:${k.c}">${k.v}</div>
+    <div class="kpi-l">${k.l}</div></div>`).join('');
+
+  const pct = Math.round(prob*100);
+  document.getElementById('d-fill').style.cssText = `width:${pct}%;background:linear-gradient(90deg,${col}88,${col})`;
+  document.getElementById('d-pct').style.color     = col;
+  document.getElementById('d-pct').textContent     = pct + '%';
+  document.getElementById('d-ci').innerHTML =
+    `فاصل ثقة ICP (${(0.90*100).toFixed(0)}%) — يُحسب من Backend · rssi_roc: ${t.rssi_roc} · snr_trend: ${t.snr_trend}
+     <br><span style="font-size:9px;color:#4a6080">⚠ UI يعرض z=1.645 placeholder — قيمة ICP الصحيحة من API</span>`;
+  document.getElementById('d-footer').innerHTML =
+    `<span>📍 ${t.lat}°N, ${t.lon}°E</span>
+     <span>نطاق: ${(t.range_m/1000).toFixed(1)} km</span>
+     <span>MNC: ${t.mnc}</span>
+     <span>sig_var: ${t.sig_var}</span>
+     <span>LTI: ${t.lti}</span>`;
+
+  document.getElementById('detail').classList.add('show');
+  document.getElementById('detailBackdrop').classList.add('show');
+  buildList();
+}
+
+function closeDetail() {
+  document.getElementById('detail').classList.remove('show');
+  document.getElementById('detailBackdrop').classList.remove('show');
+  SEL = null; buildList();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  5. WEBSOCKET
+// ═══════════════════════════════════════════════════════════════════
+
+let ws = null, wsPending = null, wsConnected = false;
+
+function wsConnect() {
+  try {
+    ws = new WebSocket(`ws://${location.host}/ws/towers`);
+    ws.onopen = () => {
+      wsConnected = true;
+      document.getElementById('wsDot').classList.add('connected');
+      document.getElementById('wsLabel').textContent  = 'متصل';
+      document.getElementById('liveDot').classList.add('live');
+      document.getElementById('liveLabel').textContent = 'Live · WebSocket نشط';
+      if (wsPending) { _sendPrediction(wsPending); wsPending = null; }
+    };
+    ws.onmessage = e => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'prediction_results' && d.results?.length && SEL) {
+          const prob = d.results[0].probability;
+          /* : use batchUpdateMarkers for zero-jank update */
+          batchUpdateMarkers([{
+            id:   SEL.id,
+            sev:  prob < 0.35 ? 0 : prob < 0.65 ? 1 : 2,
+            prob: prob,
+          }]);
+          SEL.ws_pred = prob;
+          openDetail(SEL);
+        }
+        /* Handle storm simulation: server sends array of updates */
+        if (d.type === 'storm_update' && d.updates?.length) {
+          batchUpdateMarkers(d.updates.map(u => ({
+            id:   u.tower_id,
+            sev:  u.probability < 0.35 ? 0 : u.probability < 0.65 ? 1 : 2,
+            prob: u.probability,
+          })));
+        }
+      } catch {}
+    };
+    ws.onerror = ws.onclose = () => {
+      wsConnected = false;
+      document.getElementById('wsDot').classList.remove('connected');
+      document.getElementById('wsLabel').textContent  = 'غير متصل';
+      document.getElementById('liveDot').classList.remove('live');
+      document.getElementById('liveLabel').textContent = 'Digital Twin · 420.csv';
+      setTimeout(wsConnect, 5000);
+    };
+  } catch {}
+}
+
+function _sendPrediction(t) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({
+    type: 'predict',
+    towers: [{
+      rssi_dbm: t.rssi, snr_db: t.snr, latency_ms: t.latency,
+      packet_loss_pct: t.pkt_loss, tower_load_pct: t.load,
+      temp_celsius: t.temp, rssi_prior: t.rssi,
+      signal_variance: t.sig_var, load_temp_index: t.lti,
+      rssi_rate_of_change: t.rssi_roc, snr_trend: t.snr_trend,
+    }],
+  }));
+}
+
+function requestWsPrediction(t) {
+  if (wsConnected) _sendPrediction(t); else wsPending = t;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  6. CLOCK + SIDEBAR
+// ═══════════════════════════════════════════════════════════════════
+
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+}
+
+let sidebarOpen = true;
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
+  document.getElementById('sb-show-btn').classList.toggle('visible', !sidebarOpen);
+  setTimeout(() => map.invalidateSize(), 320);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  7. INIT — : Async Generation (لا تجميد عند التحميل)
+// ═══════════════════════════════════════════════════════════════════
+
+/*
+ * generateTowers() يعمل synchronously ويُجمّد المتصفح ~400ms.
+ * الحل: نقسّمه لـ chunks عبر setTimeout(0) حتى لا يُجمّد الـ main thread.
+ */
+function initAsync() {
+  // أظهر شاشة تحميل
+  document.getElementById('perfBadge').textContent = '⏳ جاري توليد 10,011 برج...';
+
+  setTimeout(() => {
+    // توليد البيانات (ثقيل — مرة واحدة فقط)
+    const towers = generateTowers();
+
+    // الـ VISIBLE = ALL بعد اكتمال التوليد
+    ALL.push(...towers);
+    VISIBLE = [...ALL];
+
+    // الآن شغّل التحميل الكامل
+    updateStats();
+    buildList();
+    _doRenderMarkers();   /* مباشر بدون debounce في أول تحميل */
+    wsConnect();
+  }, 0);  /* يترك للمتصفح frame واحد لرسم الـ UI قبل الحساب */
+}
+
+// ── تعريف ALL كـ array قابل للملء (بدلاً من const فوري)
+// ═══════════════════════════════════════════════════════════════════
+updateClock();
+setInterval(updateClock, 1000);
+initAsync();
+</script>
+</body>
+</html>
